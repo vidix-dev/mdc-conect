@@ -104,7 +104,11 @@ const App = {
     this.applyTheme();
     this.syncFromCloud();
     this.checkAuthStatus();
-    setInterval(() => this.syncFromCloud(), 15000);
+    setInterval(() => this.syncFromCloud(), 4000);
+    window.addEventListener("focus", () => this.syncFromCloud());
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") this.syncFromCloud();
+    });
   },
 
   bindEvents() {
@@ -506,9 +510,9 @@ const App = {
   isGasConnected: false,
 
   async callCloud(action, payload = {}) {
-    const cloudUrl = store.data.settings.cloudApiUrl || "https://extranet-cad.duckdns.org/mdc-api/";
+    const baseUrl = (store.data.settings.cloudApiUrl || "https://extranet-cad.duckdns.org/mdc-api/").replace(/\/?$/, "/");
     try {
-      const response = await fetch(cloudUrl, {
+      const response = await fetch(baseUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action, ...payload })
@@ -526,9 +530,9 @@ const App = {
   },
 
   async syncFromCloud() {
-    const cloudUrl = store.data.settings.cloudApiUrl || "https://extranet-cad.duckdns.org/mdc-api/";
+    const baseUrl = (store.data.settings.cloudApiUrl || "https://extranet-cad.duckdns.org/mdc-api/").replace(/\/?$/, "/");
     try {
-      const res = await fetch(cloudUrl + "syncAll");
+      const res = await fetch(baseUrl + "syncAll");
       const data = await res.json();
       if (data && data.success) {
         this.isCloudConnected = true;
@@ -553,13 +557,28 @@ const App = {
           });
         }
         if (Array.isArray(data.events)) {
-          store.data.events = data.events;
+          const serverIds = new Set(data.events.map(e => e.id));
+          const localOnly = (store.data.events || []).filter(e => !serverIds.has(e.id));
+          if (localOnly.length > 0) {
+            localOnly.forEach(le => this.callCloud("saveEvent", { event: le }));
+          }
+          store.data.events = [...localOnly, ...data.events];
         }
         if (Array.isArray(data.notes)) {
-          store.data.notes = data.notes;
+          const serverIds = new Set(data.notes.map(n => n.id));
+          const localOnly = (store.data.notes || []).filter(n => !serverIds.has(n.id));
+          if (localOnly.length > 0) {
+            localOnly.forEach(ln => this.callCloud("saveNote", { note: ln }));
+          }
+          store.data.notes = [...localOnly, ...data.notes];
         }
         if (Array.isArray(data.tasks)) {
-          store.data.tasks = data.tasks;
+          const serverIds = new Set(data.tasks.map(t => t.id));
+          const localOnly = (store.data.tasks || []).filter(t => !serverIds.has(t.id));
+          if (localOnly.length > 0) {
+            localOnly.forEach(lt => this.callCloud("saveTask", { task: lt }));
+          }
+          store.data.tasks = [...localOnly, ...data.tasks];
         }
         if (Array.isArray(data.accounts) && data.accounts.length > 0) {
           const existingUsernames = new Set(data.accounts.map(a => a.username.toLowerCase()));
@@ -724,6 +743,13 @@ const App = {
     });
     if (tabId === "calendar") {
       this.renderCalendar();
+      this.syncFromCloud();
+    } else if (tabId === "tasks") {
+      this.renderTasksAndNotes();
+      this.syncFromCloud();
+    } else if (tabId === "drive") {
+      this.renderDriveFiles();
+      this.syncFromCloud();
     }
   },
 
@@ -1710,13 +1736,14 @@ const App = {
     this.openModal("modal-add-event");
   },
 
-  saveEventFromModal() {
-    const title = document.getElementById("event-title-input").value;
-    const date = document.getElementById("event-date-input").value;
-    const time = document.getElementById("event-time-input").value;
-    const location = document.getElementById("event-loc-input").value;
-    const category = document.getElementById("event-cat-input").value;
-    const description = document.getElementById("event-desc-input").value;
+  async saveEventFromModal() {
+    const title = document.getElementById("event-title-input")?.value?.trim();
+    const date = document.getElementById("event-date-input")?.value;
+    const time = document.getElementById("event-time-input")?.value;
+    const location = document.getElementById("event-loc-input")?.value;
+    const category = document.getElementById("event-cat-input")?.value;
+    const description = document.getElementById("event-desc-input")?.value;
+    if (!title || !date) return;
 
     const newEvent = {
       id: "ev_" + Date.now(),
@@ -1724,27 +1751,32 @@ const App = {
       date,
       time: time || "19:00",
       location: location || "MDC",
-      category,
-      description
+      category: category || "event",
+      description: description || ""
     };
 
     store.data.events.push(newEvent);
     store.save();
-    this.pushSyncToCloud();
+    document.getElementById("form-add-event")?.reset();
     this.closeModal("modal-add-event");
     this.renderCalendar();
     this.showToast("Événement programmé");
+
+    await this.callCloud("saveEvent", { event: newEvent });
+    await this.pushSyncToCloud();
   },
 
-  showEventDetail(id) {
+  async showEventDetail(id) {
     const ev = store.data.events.find(e => e.id === id);
     if (!ev) return;
     if (confirm(`Événement MDC :\n\n${ev.title}\nDate : ${ev.date} (${ev.time})\nLieu : ${ev.location}\nDescription : ${ev.description || "Aucune"}\n\nVoulez-vous supprimer cet événement ?`)) {
       store.data.events = store.data.events.filter(e => e.id !== id);
       store.save();
-      this.pushSyncToCloud();
       this.renderCalendar();
       this.showToast("Événement supprimé");
+
+      await this.callCloud("deleteEvent", { eventId: id });
+      await this.pushSyncToCloud();
     }
   },
 
@@ -1899,11 +1931,12 @@ const App = {
     }
   },
 
-  addTask(title) {
+  async addTask(title) {
+    if (!title || !title.trim()) return;
     const authorName = store.data.currentUser ? store.data.currentUser.firstName : "MDC";
     const newTask = {
       id: "t_" + Date.now(),
-      title,
+      title: title.trim(),
       completed: false,
       due: "À planifier",
       priority: "normal",
@@ -1911,33 +1944,41 @@ const App = {
     };
     store.data.tasks.unshift(newTask);
     store.save();
-    this.pushSyncToCloud();
     this.renderTasksAndNotes();
     this.showToast("Tâche ajoutée");
+
+    await this.callCloud("saveTask", { task: newTask });
+    await this.pushSyncToCloud();
   },
 
-  toggleTask(id) {
+  async toggleTask(id) {
     const task = store.data.tasks.find(t => t.id === id);
     if (task) {
       task.completed = !task.completed;
       store.save();
-      this.pushSyncToCloud();
       this.renderTasksAndNotes();
+
+      await this.callCloud("saveTask", { task });
+      await this.pushSyncToCloud();
     }
   },
 
-  deleteTask(id) {
+  async deleteTask(id) {
     store.data.tasks = store.data.tasks.filter(t => t.id !== id);
     store.save();
-    this.pushSyncToCloud();
     this.renderTasksAndNotes();
     this.showToast("Tâche supprimée");
+
+    await this.callCloud("deleteTask", { taskId: id });
+    await this.pushSyncToCloud();
   },
 
-  saveNoteFromModal() {
-    const title = document.getElementById("note-title-input").value;
-    const tag = document.getElementById("note-tag-input").value;
-    const content = document.getElementById("note-content-input").value;
+  async saveNoteFromModal() {
+    const title = (document.getElementById("note-title-input")?.value || "").trim();
+    const tag = (document.getElementById("note-tag-input")?.value || "").trim();
+    const content = (document.getElementById("note-content-input")?.value || "").trim();
+    if (!title) return;
+
     const authorName = store.data.currentUser ? `${store.data.currentUser.firstName} ${store.data.currentUser.lastName.charAt(0)}.` : "MDC";
 
     const newNote = {
@@ -1951,10 +1992,13 @@ const App = {
 
     store.data.notes.unshift(newNote);
     store.save();
-    this.pushSyncToCloud();
+    document.getElementById("form-add-note")?.reset();
     this.closeModal("modal-add-note");
     this.renderTasksAndNotes();
     this.showToast("Note enregistrée");
+
+    await this.callCloud("saveNote", { note: newNote });
+    await this.pushSyncToCloud();
   },
 
   openNoteViewer(id) {
@@ -1963,13 +2007,15 @@ const App = {
     alert(`Note MDC : ${note.title}\nPar ${note.author} (${note.date})\nThème : ${note.tag}\n\n${note.content}`);
   },
 
-  deleteNote(id) {
+  async deleteNote(id) {
     if (confirm("Supprimer cette note ?")) {
       store.data.notes = store.data.notes.filter(n => n.id !== id);
       store.save();
-      this.pushSyncToCloud();
       this.renderTasksAndNotes();
       this.showToast("Note supprimée");
+
+      await this.callCloud("deleteNote", { noteId: id });
+      await this.pushSyncToCloud();
     }
   },
 
