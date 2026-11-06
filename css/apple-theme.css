@@ -1393,6 +1393,48 @@ a {
   border: 1px solid var(--border-subtle);
 }
 
+/* Cloud Status Pill */
+.cloud-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  font-weight: 500;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  background-color: var(--color-surface-secondary);
+  border: 1px solid var(--border-subtle);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.cloud-status-pill:hover {
+  background-color: var(--color-surface);
+  border-color: var(--border-strong);
+}
+
+.cloud-status-pill .status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: var(--color-apple-orange);
+  display: inline-block;
+  flex-shrink: 0;
+  transition: background-color 0.25s ease;
+}
+
+.cloud-status-pill.connected {
+  border-color: rgba(52, 199, 89, 0.3);
+  color: var(--color-apple-green);
+}
+
+.cloud-status-pill.connected .status-dot {
+  background-color: var(--color-apple-green);
+  box-shadow: 0 0 6px rgba(52, 199, 89, 0.4);
+}
+
 /* Apple QuickLook & Document Reader */
 .apple-doc-sheet {
   width: 100%;

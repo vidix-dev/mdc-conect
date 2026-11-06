@@ -498,6 +498,67 @@ const App = {
   /* ==========================================
      GOOGLE APPS SCRIPT WEB APP INTEGRATION (4TB)
      ========================================== */
+  isGasConnected: false,
+
+  async callGAS(action, payload = {}) {
+    const url = store.data.settings.gasWebappUrl;
+    if (!url) return null;
+
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        body: JSON.stringify({ action, ...payload })
+      });
+      const text = await response.text();
+      try {
+        const data = JSON.parse(text);
+        if (data && data.success) {
+          this.isGasConnected = true;
+          this.updateGasStatusUI("connected");
+        }
+        return data;
+      } catch (parseErr) {
+        this.updateGasStatusUI("pending");
+        return null;
+      }
+    } catch (netErr) {
+      console.warn("Erreur réseau GAS:", netErr);
+      this.updateGasStatusUI("pending");
+      return null;
+    }
+  },
+
+  updateGasStatusUI(status) {
+    const badge = document.getElementById("gdrive-status-badge");
+    const text = document.getElementById("gdrive-status-text");
+    if (!badge || !text) return;
+
+    if (status === "connected") {
+      badge.classList.add("connected");
+      text.textContent = "Google Drive 4 To · Synchronisé";
+      badge.title = "Connecté à votre Google Drive 4 To. Tous les fichiers sont synchronisés.";
+    } else {
+      badge.classList.remove("connected");
+      text.textContent = "Google Drive 4 To · En attente d'accès";
+      badge.title = "Cliquez pour tester la synchronisation avec votre Google Drive.";
+    }
+  },
+
+  async checkGasConnection(showToastMessage = false) {
+    if (showToastMessage) {
+      this.showToast("Test de connexion à Google Drive 4 To en cours...");
+    }
+    await this.syncFromGAS();
+    if (this.isGasConnected) {
+      if (showToastMessage) this.showToast("Connexion à Google Drive 4 To active et synchronisée");
+    } else {
+      if (showToastMessage) {
+        this.showToast("Passerelle en attente d'accès public dans Google Apps Script");
+        this.openModal("modal-settings");
+      }
+    }
+  },
+
   async syncFromGAS() {
     const url = store.data.settings.gasWebappUrl;
     if (!url) return;
@@ -508,11 +569,28 @@ const App = {
       try {
         const data = JSON.parse(text);
         if (data && data.success) {
+          this.isGasConnected = true;
+          this.updateGasStatusUI("connected");
+
           if (Array.isArray(data.folders)) {
             store.data.folders = data.folders;
           }
           if (Array.isArray(data.files)) {
-            store.data.files = data.files;
+            // Conserver le cache local dataUrl si disponible
+            const localCacheMap = new Map();
+            store.data.files.forEach(f => {
+              if (f.url && f.url.startsWith("data:")) {
+                localCacheMap.set(f.id, f.url);
+                if (f.driveFileId) localCacheMap.set(f.driveFileId, f.url);
+              }
+            });
+
+            store.data.files = data.files.map(df => {
+              if (localCacheMap.has(df.id)) {
+                df.url = localCacheMap.get(df.id);
+              }
+              return df;
+            });
           }
           if (Array.isArray(data.events)) {
             store.data.events = data.events;
@@ -524,7 +602,7 @@ const App = {
             store.data.tasks = data.tasks;
           }
           if (Array.isArray(data.accounts) && data.accounts.length > 0) {
-            // Keep admin vdoussot19 always present
+            // Toujours maintenir l'admin vdoussot19
             const existingUsernames = new Set(data.accounts.map(a => a.username.toLowerCase()));
             const admin = store.data.accounts.find(a => a.username === "vdoussot19");
             if (admin && !existingUsernames.has("vdoussot19")) {
@@ -538,12 +616,14 @@ const App = {
           this.renderCalendar();
           this.renderTasksAndNotes();
           this.renderAccountsList();
+        } else {
+          this.updateGasStatusUI("pending");
         }
       } catch (parseErr) {
-        // En attente d'autorisation Google Apps Script
+        this.updateGasStatusUI("pending");
       }
     } catch (e) {
-      console.warn("GAS sync notice:", e);
+      this.updateGasStatusUI("pending");
     }
   },
 
@@ -554,8 +634,6 @@ const App = {
     try {
       await fetch(url, {
         method: "POST",
-        mode: "no-cors",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "saveSyncData",
           events: store.data.events,
@@ -654,20 +732,33 @@ const App = {
     this.renderDriveFiles();
   },
 
-  createFolder(name) {
+  async createFolder(name) {
+    const parentFolder = this.getCurrentFolder();
+    const tempId = "fld_" + Date.now();
     const newFolder = {
-      id: "fld_" + Date.now(),
+      id: tempId,
       name: name,
-      parentId: store.data.currentFolderId || "root"
+      parentId: parentFolder.id || "root"
     };
     store.data.folders.push(newFolder);
     store.save();
     this.renderFolders();
     this.renderDriveBreadcrumbs();
     this.showToast(`Dossier « ${name} » créé`);
+
+    // Synchronisation vers Google Drive (4 To)
+    const gasRes = await this.callGAS("createFolder", {
+      folderName: name,
+      folderId: parentFolder.id || "root"
+    });
+    if (gasRes && gasRes.success && gasRes.folder) {
+      newFolder.id = gasRes.folder.id;
+      store.save();
+      this.renderFolders();
+    }
   },
 
-  deleteFolder(folderId, e) {
+  async deleteFolder(folderId, e) {
     if (e) e.stopPropagation();
     const folder = store.data.folders.find(f => f.id === folderId);
     if (!folder) return;
@@ -678,6 +769,8 @@ const App = {
       this.renderFolders();
       this.renderDriveFiles();
       this.showToast("Dossier supprimé");
+
+      await this.callGAS("deleteFolder", { folderId });
     }
   },
 
@@ -730,6 +823,7 @@ const App = {
   },
 
   renderDriveFiles() {
+    this.updateGasStatusUI(this.isGasConnected ? "connected" : "pending");
     const container = document.getElementById("files-grid-container");
     if (!container) return;
 
@@ -827,9 +921,23 @@ const App = {
       downloadBtn.onclick = () => this.downloadSingleFile(file.id);
     }
 
+    const openGdriveBtn = document.getElementById("btn-open-gdrive");
+    if (openGdriveBtn) {
+      if (file.webUrl) {
+        openGdriveBtn.style.display = "inline-flex";
+        openGdriveBtn.onclick = () => window.open(file.webUrl, "_blank");
+      } else if (file.driveFileId) {
+        openGdriveBtn.style.display = "inline-flex";
+        openGdriveBtn.onclick = () => window.open("https://drive.google.com/file/d/" + file.driveFileId + "/view", "_blank");
+      } else {
+        openGdriveBtn.style.display = "none";
+      }
+    }
+
     this.openModal("modal-file-viewer");
 
     const ext = (file.name.split('.').pop() || "").toLowerCase();
+    const drivePreviewUrl = file.googlePreviewUrl || (file.url && file.url.startsWith("https://drive.google.com") ? file.url : (file.driveFileId ? `https://drive.google.com/file/d/${file.driveFileId}/preview` : null));
 
     if (file.type === "image") {
       container.innerHTML = `<img src="${file.url || 'assets/logo.jpg'}" alt="${file.name}">`;
@@ -838,8 +946,10 @@ const App = {
     } else if (file.type === "audio") {
       container.innerHTML = `<audio controls class="apple-audio-player" src="${file.url || ''}"></audio>`;
     } else if (file.type === "pdf") {
-      if (file.url) {
+      if (file.url && file.url.startsWith("data:")) {
         container.innerHTML = `<iframe src="${file.url}" style="width:100%; height:540px; border:none; border-radius:12px; background:#fff;"></iframe>`;
+      } else if (drivePreviewUrl) {
+        container.innerHTML = `<iframe src="${drivePreviewUrl}" style="width:100%; height:540px; border:none; border-radius:12px; background:#fff;"></iframe>`;
       } else {
         container.innerHTML = this.renderDocumentFallbackCard(file, "Document PDF");
       }
@@ -855,17 +965,27 @@ const App = {
         container.innerHTML = rendered;
       } catch (err) {
         console.error("Erreur lecture DOCX:", err);
-        container.innerHTML = this.renderDocumentFallbackCard(file, "Document Microsoft Word (.docx)");
+        if (drivePreviewUrl) {
+          container.innerHTML = `<iframe src="${drivePreviewUrl}" style="width:100%; height:540px; border:none; border-radius:12px; background:#fff;"></iframe>`;
+        } else {
+          container.innerHTML = this.renderDocumentFallbackCard(file, "Document Microsoft Word (.docx)");
+        }
       }
     } else if (ext === "xlsx" || ext === "xls") {
       try {
         const rendered = await this.renderXlsxPreview(file);
         container.innerHTML = rendered;
       } catch (err) {
-        container.innerHTML = this.renderDocumentFallbackCard(file, "Feuille de calcul Excel (.xlsx)");
+        if (drivePreviewUrl) {
+          container.innerHTML = `<iframe src="${drivePreviewUrl}" style="width:100%; height:540px; border:none; border-radius:12px; background:#fff;"></iframe>`;
+        } else {
+          container.innerHTML = this.renderDocumentFallbackCard(file, "Feuille de calcul Excel (.xlsx)");
+        }
       }
     } else if (file.type === "spreadsheet" && file.content && (file.content.includes("\t") || file.content.includes(","))) {
       container.innerHTML = this.renderCsvPreview(file.content);
+    } else if (drivePreviewUrl && (!file.url || !file.url.startsWith("data:"))) {
+      container.innerHTML = `<iframe src="${drivePreviewUrl}" style="width:100%; height:540px; border:none; border-radius:12px; background:#fff;"></iframe>`;
     } else if (file.content && !file.content.startsWith("PK")) {
       container.innerHTML = `<div class="text-viewer-box">${this.escapeHTML(file.content)}</div>`;
     } else {
@@ -1153,11 +1273,17 @@ const App = {
     const file = store.data.files.find(f => f.id === fileId);
     if (!file) return;
 
-    if (file.url && file.url.startsWith("data:")) {
+    if (file.downloadUrl) {
+      window.open(file.downloadUrl, "_blank");
+    } else if (file.driveFileId) {
+      window.open("https://drive.google.com/uc?export=download&id=" + file.driveFileId, "_blank");
+    } else if (file.url && file.url.startsWith("data:")) {
       const a = document.createElement("a");
       a.href = file.url;
       a.download = file.name;
       a.click();
+    } else if (file.webUrl) {
+      window.open(file.webUrl, "_blank");
     } else {
       const blob = new Blob([file.content || file.name], { type: "application/octet-stream;charset=utf-8" });
       const a = document.createElement("a");
@@ -1168,16 +1294,19 @@ const App = {
     this.showToast(`Téléchargement de « ${file.name} » lancé`);
   },
 
-  deleteFile(fileId, e) {
+  async deleteFile(fileId, e) {
     if (e) e.stopPropagation();
     const file = store.data.files.find(f => f.id === fileId);
     if (!file) return;
     if (confirm(`Confirmez-vous la suppression du fichier « ${file.name} » ?`)) {
+      const driveId = file.driveFileId || file.id;
       store.data.files = store.data.files.filter(f => f.id !== fileId);
       store.save();
       this.renderDriveFiles();
       this.renderFolders();
       this.showToast("Fichier supprimé");
+
+      await this.callGAS("deleteFile", { fileId: driveId });
     }
   },
 
@@ -1245,66 +1374,71 @@ const App = {
       cat = "documents";
     }
 
-    const currentFolderId = store.data.currentFolderId || "root";
+    const currentFolder = this.getCurrentFolder();
+    const currentFolderId = currentFolder.id || "root";
     const authorName = store.data.currentUser ? `${store.data.currentUser.firstName} ${store.data.currentUser.lastName.charAt(0)}.` : "Membre MDC";
-    const isPlainText = ["txt", "md", "markdown", "csv", "tsv", "json", "xml", "html", "css", "js", "log", "yml", "yaml"].includes(ext);
+
+    this.showToast(`Envoi de « ${fileObj.name} » vers Google Drive (4 To)...`);
 
     const reader = new FileReader();
+    reader.onload = async (e) => {
+      const dataUrl = e.target.result;
+      const base64Data = dataUrl.includes("base64,") ? dataUrl.split("base64,")[1] : "";
 
-    if (isPlainText) {
-      reader.onload = (e) => {
-        const textData = e.target.result;
-        let base64Url = "";
-        try {
-          base64Url = "data:text/plain;charset=utf-8;base64," + btoa(unescape(encodeURIComponent(textData)));
-        } catch (_) {
-          base64Url = "";
+      const tempId = "f_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
+      const newFile = {
+        id: tempId,
+        driveFileId: null,
+        folderId: currentFolderId,
+        name: fileObj.name,
+        type: type,
+        size: (fileObj.size / (1024 * 1024)).toFixed(2) + " Mo",
+        date: new Date().toLocaleDateString("fr-FR"),
+        category: cat,
+        author: authorName,
+        url: dataUrl,
+        downloadUrl: null,
+        webUrl: null,
+        googlePreviewUrl: null,
+        content: ""
+      };
+
+      store.data.files.unshift(newFile);
+      store.save();
+      this.renderDriveFiles();
+      this.renderFolders();
+
+      // Envoi direct vers Google Drive 4 To via GAS Web App
+      try {
+        const gasRes = await this.callGAS("upload", {
+          fileName: fileObj.name,
+          mimeType: fileObj.type || "application/octet-stream",
+          base64: base64Data,
+          folderId: currentFolderId,
+          author: authorName
+        });
+
+        if (gasRes && gasRes.success && gasRes.file) {
+          const idx = store.data.files.findIndex(f => f.id === tempId);
+          if (idx !== -1) {
+            store.data.files[idx].driveFileId = gasRes.file.id;
+            store.data.files[idx].downloadUrl = gasRes.file.downloadUrl;
+            store.data.files[idx].webUrl = gasRes.file.webUrl;
+            if (gasRes.file.url) {
+              store.data.files[idx].googlePreviewUrl = gasRes.file.url;
+            }
+            store.save();
+            this.renderDriveFiles();
+          }
+          this.showToast(`« ${fileObj.name} » stocké sur votre Google Drive 4 To`);
+        } else {
+          this.showToast(`« ${fileObj.name} » importé (en attente de synchronisation Google Drive)`);
         }
-
-        const newFile = {
-          id: "f_" + Date.now() + "_" + Math.floor(Math.random() * 1000),
-          folderId: currentFolderId,
-          name: fileObj.name,
-          type: type,
-          size: (fileObj.size / (1024 * 1024)).toFixed(2) + " Mo",
-          date: new Date().toLocaleDateString("fr-FR"),
-          category: cat,
-          author: authorName,
-          content: textData,
-          url: base64Url
-        };
-        store.data.files.unshift(newFile);
-        store.save();
-        this.renderDriveFiles();
-        this.renderFolders();
-        this.showToast(`Document « ${fileObj.name} » importé`);
-      };
-      reader.readAsText(fileObj);
-    } else {
-      // Binary files: DOCX, XLSX, PPTX, PDF, ZIP, Images, Audio, Video, etc.
-      // ALWAYS read as DataURL to preserve pristine binary data!
-      reader.onload = (e) => {
-        const dataUrl = e.target.result;
-        const newFile = {
-          id: "f_" + Date.now() + "_" + Math.floor(Math.random() * 1000),
-          folderId: currentFolderId,
-          name: fileObj.name,
-          type: type,
-          size: (fileObj.size / (1024 * 1024)).toFixed(2) + " Mo",
-          date: new Date().toLocaleDateString("fr-FR"),
-          category: cat,
-          author: authorName,
-          url: dataUrl,
-          content: ""
-        };
-        store.data.files.unshift(newFile);
-        store.save();
-        this.renderDriveFiles();
-        this.renderFolders();
-        this.showToast(`Fichier « ${fileObj.name} » importé avec succès`);
-      };
-      reader.readAsDataURL(fileObj);
-    }
+      } catch (err) {
+        console.warn("Échec téléversement Drive:", err);
+      }
+    };
+    reader.readAsDataURL(fileObj);
   },
 
   /* ==========================================

@@ -149,8 +149,14 @@
     <section id="view-drive" class="view-section active">
       <div class="view-header">
         <div class="view-title-group">
-          <h2>Documents & Fichiers</h2>
-          <p class="view-subtitle">Stockage 4 To Maison Du Charlo · Importation, exportation et consultation directe</p>
+          <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+            <h2>Documents & Fichiers</h2>
+            <div id="gdrive-status-badge" class="cloud-status-pill" onclick="App.checkGasConnection(true)" title="Statut Google Drive 4 To (Cliquer pour tester la synchronisation)">
+              <span class="status-dot"></span>
+              <span id="gdrive-status-text">Google Drive 4 To</span>
+            </div>
+          </div>
+          <p class="view-subtitle">Stockage 4 To Maison Du Charlo · Synchronisation Google Drive automatique</p>
         </div>
         <div class="action-bar">
           <input type="file" id="file-picker-hidden" multiple style="display:none;">
@@ -543,6 +549,10 @@
       </div>
       <div class="modal-footer">
         <button class="apple-btn modal-cancel-btn">Fermer</button>
+        <button class="apple-btn" id="btn-open-gdrive" style="display:none;" title="Consulter dans Google Drive">
+          <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+          <span>Ouvrir sur Drive</span>
+        </button>
         <button class="apple-btn btn-primary" id="btn-download-file">
           <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           <span>Télécharger ce fichier</span>
