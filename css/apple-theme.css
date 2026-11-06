@@ -1472,3 +1472,191 @@ a {
     grid-template-columns: 1fr;
   }
 }
+
+/* ========================================================
+   FOLDERS SYSTEM & MULTIMEDIA VIEWER STYLES
+   ======================================================== */
+.folders-section {
+  margin-bottom: 24px;
+}
+
+.section-subhead {
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-tertiary);
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.folders-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.folder-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  background-color: var(--color-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: var(--shadow-sm);
+}
+
+.folder-card:hover {
+  border-color: var(--color-apple-blue);
+  background-color: var(--color-surface-hover);
+  transform: translateY(-1px);
+}
+
+.folder-card-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.folder-card-icon {
+  width: 28px;
+  height: 28px;
+  color: var(--color-apple-blue);
+  flex-shrink: 0;
+}
+
+.folder-card-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.folder-card-name {
+  font-size: 13.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.folder-card-count {
+  font-size: 11.5px;
+  color: var(--color-text-tertiary);
+}
+
+.folder-delete-btn {
+  background: transparent;
+  border: none;
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+  opacity: 0;
+  transition: all 0.15s ease;
+  padding: 4px;
+  border-radius: 4px;
+}
+
+.folder-card:hover .folder-delete-btn {
+  opacity: 0.8;
+}
+
+.folder-delete-btn:hover {
+  opacity: 1 !important;
+  color: var(--color-apple-red);
+}
+
+/* File Actions Row on Card */
+.file-card-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.file-mini-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  background-color: var(--color-surface-secondary);
+  border: 1px solid var(--border-subtle);
+  color: var(--color-text-secondary);
+  font-size: 11.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.file-mini-btn:hover {
+  background-color: var(--color-surface-hover);
+  color: var(--color-text-primary);
+}
+
+.file-mini-btn.btn-delete:hover {
+  background-color: var(--color-apple-red-light);
+  color: var(--color-apple-red);
+  border-color: transparent;
+}
+
+/* Multimedia Player in Viewer */
+.apple-video-player {
+  max-width: 100%;
+  max-height: 480px;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  outline: none;
+}
+
+.apple-audio-player {
+  width: 100%;
+  max-width: 500px;
+  margin: 20px 0;
+}
+
+/* Spreadsheet Data Table */
+.apple-table-wrap {
+  width: 100%;
+  max-height: 420px;
+  overflow: auto;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  background-color: var(--color-surface);
+}
+
+.apple-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  text-align: left;
+}
+
+.apple-table th {
+  background-color: var(--color-surface-secondary);
+  padding: 10px 14px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  border-bottom: 1px solid var(--border-subtle);
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.apple-table td {
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--color-text-primary);
+}
+
+.apple-table tr:hover td {
+  background-color: var(--color-surface-hover);
+}
