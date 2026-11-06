@@ -532,15 +532,13 @@ const App = {
   async syncFromCloud() {
     const baseUrl = (store.data.settings.cloudApiUrl || "https://extranet-cad.duckdns.org/mdc-api/").replace(/\/?$/, "/");
     try {
-      const res = await fetch(baseUrl + "syncAll");
+      const res = await fetch(baseUrl + "syncAll?_t=" + Date.now());
       const data = await res.json();
       if (data && data.success) {
         this.isCloudConnected = true;
         this.updateGasStatusUI("connected");
 
-        if (Array.isArray(data.folders)) {
-          store.data.folders = data.folders;
-        }
+        if (Array.isArray(data.folders)) store.data.folders = data.folders;
         if (Array.isArray(data.files)) {
           // Conserver les dataUrl locales si présentes
           const localCache = new Map();
@@ -556,30 +554,9 @@ const App = {
             return df;
           });
         }
-        if (Array.isArray(data.events)) {
-          const serverIds = new Set(data.events.map(e => e.id));
-          const localOnly = (store.data.events || []).filter(e => !serverIds.has(e.id));
-          if (localOnly.length > 0) {
-            localOnly.forEach(le => this.callCloud("saveEvent", { event: le }));
-          }
-          store.data.events = [...localOnly, ...data.events];
-        }
-        if (Array.isArray(data.notes)) {
-          const serverIds = new Set(data.notes.map(n => n.id));
-          const localOnly = (store.data.notes || []).filter(n => !serverIds.has(n.id));
-          if (localOnly.length > 0) {
-            localOnly.forEach(ln => this.callCloud("saveNote", { note: ln }));
-          }
-          store.data.notes = [...localOnly, ...data.notes];
-        }
-        if (Array.isArray(data.tasks)) {
-          const serverIds = new Set(data.tasks.map(t => t.id));
-          const localOnly = (store.data.tasks || []).filter(t => !serverIds.has(t.id));
-          if (localOnly.length > 0) {
-            localOnly.forEach(lt => this.callCloud("saveTask", { task: lt }));
-          }
-          store.data.tasks = [...localOnly, ...data.tasks];
-        }
+        if (Array.isArray(data.events)) store.data.events = data.events;
+        if (Array.isArray(data.notes)) store.data.notes = data.notes;
+        if (Array.isArray(data.tasks)) store.data.tasks = data.tasks;
         if (Array.isArray(data.accounts) && data.accounts.length > 0) {
           const existingUsernames = new Set(data.accounts.map(a => a.username.toLowerCase()));
           const admin = store.data.accounts.find(a => a.username === "vdoussot19");
@@ -588,6 +565,7 @@ const App = {
           }
           store.data.accounts = data.accounts;
         }
+
         store.save();
         this.renderFolders();
         this.renderDriveFiles();
@@ -598,9 +576,6 @@ const App = {
     } catch (e) {
       console.warn("Erreur synchronisation cloud:", e);
     }
-
-    // Synchronisation secondaire Google Apps Script
-    this.syncFromGAS();
   },
 
   async pushSyncToCloud() {
@@ -610,7 +585,6 @@ const App = {
       tasks: store.data.tasks,
       accounts: store.data.accounts
     });
-    this.pushSyncToGAS();
   },
 
   async callGAS(action, payload = {}) {
