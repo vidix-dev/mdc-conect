@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>MDC-Conect · Cloud Unifié Maison Du Charlo</title>
+  
+  <!-- Apple Web App & Meta -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="MDC-Conect">
+  <meta name="description" content="Espace cloud confiné et collaboratif pour la Maison Du Charlo. Google Drive, Google Calendar et Google Tasks sous une interface Apple fluide.">
+  <link rel="icon" type="image/jpeg" href="assets/logo.jpg">
+  <link rel="apple-touch-icon" href="assets/logo.jpg">
+
+  <!-- Apple Theme Stylesheet -->
+  <link rel="stylesheet" href="css/apple-theme.css">
+
+  <!-- Google Identity Services (GIS) for Google Suite OAuth2 -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+
+  <!-- Translucent Top Header (Apple macOS / iPadOS Style) -->
+  <header class="apple-header">
+    <div class="brand-section">
+      <div class="brand-logo-wrap" onclick="App.switchTab('drive')">
+        <img id="app-header-logo" src="assets/logo.jpg" alt="Maison Du Charlo" class="brand-logo-img">
+        <span class="brand-badge">MDC-Conect</span>
+      </div>
+    </div>
+
+    <!-- Segmented Control Navigation -->
+    <nav class="segmented-nav" aria-label="Navigation principale">
+      <button class="nav-tab active" data-tab="drive">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+        <span>Fichiers</span>
+      </button>
+      <button class="nav-tab" data-tab="calendar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        <span>Calendrier</span>
+      </button>
+      <button class="nav-tab" data-tab="tasks">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+        <span>Notes & Tâches</span>
+      </button>
+      <button class="nav-tab" data-tab="team">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+        <span>Membres</span>
+      </button>
+    </nav>
+
+    <!-- Header Right Controls -->
+    <div class="header-actions">
+      <!-- Search Input -->
+      <div class="apple-search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" placeholder="Rechercher sur MDC..." aria-label="Recherche globale">
+      </div>
+
+      <!-- Sync Status Pill -->
+      <div class="status-indicator" title="État de connexion cloud">
+        <span class="status-dot" id="status-dot"></span>
+        <span id="status-text">Mode Local MDC</span>
+      </div>
+
+      <!-- Dark / Light Mode Toggle -->
+      <button class="icon-btn" id="btn-toggle-theme" title="Changer le thème">
+        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
+      </button>
+
+      <!-- Google Suite Cloud Settings -->
+      <button class="icon-btn" onclick="App.openModal('modal-settings')" title="Paramètres Google Suite">
+        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+      </button>
+
+      <!-- User Profile & Account Switcher -->
+      <button class="user-profile-btn" onclick="App.openModal('modal-account')" title="Gérer le compte et les accès">
+        <div class="user-avatar" id="user-avatar-display">VD</div>
+        <span class="user-name-label" id="user-name-display">Victor Doussot</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main App Canvas -->
+  <main class="app-container">
+
+    <!-- ==========================================
+         VIEW 1: FICHIERS (GOOGLE DRIVE CONFINÉ)
+         ========================================== -->
+    <section id="view-drive" class="view-section active">
+      <div class="view-header">
+        <div class="view-title-group">
+          <h2>Cloud Documents MDC</h2>
+          <p class="view-subtitle">Consultez, partagez et téléchargez les ressources sans l'interface de Google Drive</p>
+        </div>
+        <div class="action-bar">
+          <input type="file" id="file-picker-hidden" style="display:none;">
+          <button class="apple-btn btn-primary" onclick="document.getElementById('file-picker-hidden').click()">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            <span>Importer un fichier</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="drive-layout">
+        <!-- Sidebar Navigation -->
+        <aside class="drive-sidebar">
+          <div class="sidebar-category">
+            <div class="sidebar-label">Espaces</div>
+            <button class="sidebar-item active" onclick="App.setFileFilter('all', this)">
+              <div class="sidebar-item-left">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
+                <span>Tous les fichiers</span>
+              </div>
+            </button>
+            <button class="sidebar-item" onclick="App.setFileFilter('documents', this)">
+              <div class="sidebar-item-left">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                <span>Documents & PDF</span>
+              </div>
+            </button>
+            <button class="sidebar-item" onclick="App.setFileFilter('spreadsheets', this)">
+              <div class="sidebar-item-left">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/></svg>
+                <span>Tableurs & Budgets</span>
+              </div>
+            </button>
+            <button class="sidebar-item" onclick="App.setFileFilter('images', this)">
+              <div class="sidebar-item-left">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+                <span>Photos & Médias</span>
+              </div>
+            </button>
+          </div>
+
+          <!-- Storage Meter -->
+          <div class="storage-widget">
+            <div class="sidebar-label">Capacité Cloud</div>
+            <div class="storage-bar-track">
+              <div class="storage-bar-fill"></div>
+            </div>
+            <div class="storage-text">
+              <span>4.8 Mo utilisés</span>
+              <span>15 Go partagés</span>
+            </div>
+          </div>
+        </aside>
+
+        <!-- Main Files Browser -->
+        <div class="drive-content">
+          <div class="drive-toolbar">
+            <div class="breadcrumb-trail">
+              <span class="breadcrumb-item">MDC Cloud</span>
+              <span class="breadcrumb-sep">›</span>
+              <span class="breadcrumb-item">Espace Partagé</span>
+              <span class="breadcrumb-sep">›</span>
+              <span style="font-weight:600; color:var(--color-text-primary);">Ressources</span>
+            </div>
+          </div>
+
+          <!-- Files Grid -->
+          <div class="files-grid" id="files-grid-container">
+            <!-- Rendered by JS -->
+          </div>
+
+          <!-- Drag & Drop Zone -->
+          <div class="file-dropzone" id="file-dropzone">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            <h4>Déposez des fichiers ici</h4>
+            <p>Glissez-déposez n'importe quel document pour l'ajouter instantanément à l'espace MDC</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==========================================
+         VIEW 2: CALENDRIER (GOOGLE CALENDAR APPLE STYLE)
+         ========================================== -->
+    <section id="view-calendar" class="view-section">
+      <div class="view-header">
+        <div class="view-title-group">
+          <h2>Agenda Maison Du Charlo</h2>
+          <p class="view-subtitle">Planifiez les réunions, sorties et soirées avec synchronisation Google Calendar</p>
+        </div>
+        <div class="action-bar">
+          <button class="apple-btn" id="btn-export-ics" title="Exporter vers iPhone, Mac ou Android">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            <span>Exporter .ics</span>
+          </button>
+          <button class="apple-btn btn-primary" onclick="App.openAddEventModal()">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            <span>Nouvel Événement</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="calendar-layout">
+        <!-- Interactive Month Grid -->
+        <div class="calendar-main-card">
+          <div class="calendar-nav-bar">
+            <div class="cal-month-title" id="cal-month-display">Novembre 2026</div>
+            <div class="cal-nav-buttons">
+              <button class="apple-btn" onclick="App.jumpToday()">Aujourd'hui</button>
+              <button class="icon-btn" onclick="App.changeMonth(-1)" title="Mois précédent">
+                <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+              </button>
+              <button class="icon-btn" onclick="App.changeMonth(1)" title="Mois suivant">
+                <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+              </button>
+            </div>
+          </div>
+
+          <div class="cal-grid-header">
+            <div>Lun</div>
+            <div>Mar</div>
+            <div>Mer</div>
+            <div>Jeu</div>
+            <div>Ven</div>
+            <div>Sam</div>
+            <div>Dim</div>
+          </div>
+
+          <div class="cal-grid-days" id="cal-grid-days">
+            <!-- Injected by JS -->
+          </div>
+        </div>
+
+        <!-- Upcoming Events Sidebar -->
+        <div class="calendar-sidebar">
+          <div class="events-list-card">
+            <h3 style="font-size:16px; font-weight:600; margin-bottom:14px; display:flex; align-items:center; gap:8px;">
+              <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              Prochains Rendez-vous
+            </h3>
+            <div id="upcoming-events-list">
+              <!-- Injected by JS -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==========================================
+         VIEW 3: NOTES & TÂCHES (GOOGLE TASKS APPLE STYLE)
+         ========================================== -->
+    <section id="view-tasks" class="view-section">
+      <div class="view-header">
+        <div class="view-title-group">
+          <h2>Notes & Tâches Équipe</h2>
+          <p class="view-subtitle">Rappels partagés, to-do lists et comptes-rendus synchronisés</p>
+        </div>
+        <div class="action-bar">
+          <button class="apple-btn btn-primary" onclick="App.openModal('modal-add-note')">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            <span>Nouvelle Note</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="tasks-notes-layout">
+        <!-- Column 1: Reminders & Tasks -->
+        <div class="apple-column">
+          <div class="column-header">
+            <h3>
+              <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+              Tâches Partagées
+            </h3>
+          </div>
+
+          <div class="task-input-bar">
+            <input type="text" id="quick-task-input" placeholder="Ajouter un rappel ou une tâche MDC..." aria-label="Nouvelle tâche">
+            <button class="apple-btn btn-gold" id="btn-add-quick-task">Ajouter</button>
+          </div>
+
+          <div class="tasks-list" id="tasks-list-container">
+            <!-- Injected by JS -->
+          </div>
+        </div>
+
+        <!-- Column 2: Notes & Documentation -->
+        <div class="apple-column">
+          <div class="column-header">
+            <h3>
+              <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              Notes & Synthèses
+            </h3>
+          </div>
+
+          <div class="notes-grid" id="notes-grid-container">
+            <!-- Injected by JS -->
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==========================================
+         VIEW 4: MEMBRES & ÉQUIPE
+         ========================================== -->
+    <section id="view-team" class="view-section">
+      <div class="view-header">
+        <div class="view-title-group">
+          <h2>Membres de la Maison Du Charlo</h2>
+          <p class="view-subtitle">Annuaire et statut des membres connectés au portail</p>
+        </div>
+      </div>
+
+      <div class="team-grid" id="team-grid-container">
+        <!-- Injected by JS -->
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ==========================================
+       MODAL: COMPTE & AUTHENTIFICATION
+       ========================================== -->
+  <div class="modal-overlay" id="modal-account">
+    <div class="apple-modal">
+      <div class="modal-header">
+        <h3>Connexion & Profil MDC</h3>
+        <button class="modal-close-btn">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size:13.5px; color:var(--color-text-secondary); line-height:1.5;">
+          Connectez votre compte Google pour synchroniser votre Google Drive, Google Calendar et Google Tasks directement dans l'interface MDC-Conect.
+        </p>
+
+        <!-- Official Google OAuth Button -->
+        <button class="apple-btn btn-primary" id="btn-google-login" style="width:100%; padding:12px; font-weight:600; display:flex; gap:10px; justify-content:center;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12.24 10.285V14.4h6.806c-.275 1.765-2.056 5.174-6.806 5.174-4.095 0-7.439-3.389-7.439-7.574s3.344-7.574 7.439-7.574c2.33 0 3.891.989 4.785 1.849l3.254-3.138C18.189 1.186 15.479 0 12.24 0c-6.635 0-12 5.365-12 12s5.365 12 12 12c6.926 0 11.52-4.869 11.52-11.726 0-.788-.085-1.39-.189-1.989H12.24z"/>
+          </svg>
+          Se connecter avec un compte Google
+        </button>
+
+        <div style="text-align:center; position:relative; margin:10px 0;">
+          <span style="background:var(--color-card); padding:0 12px; font-size:12px; color:var(--color-text-tertiary); position:relative; z-index:1;">OU SÉLECTIONNER UN PROFIL LOCAL MDC</span>
+          <div style="position:absolute; top:50%; left:0; right:0; height:1px; background:var(--border-subtle);"></div>
+        </div>
+
+        <!-- Quick Local Account Switcher -->
+        <div style="display:flex; flex-direction:column; gap:8px;">
+          <button class="sidebar-item account-choice-btn" data-name="Victor Doussot" data-role="Président & Administrateur" data-avatar="VD">
+            <div class="sidebar-item-left">
+              <div class="user-avatar" style="width:28px; height:28px;">VD</div>
+              <div>
+                <strong style="font-size:13.5px;">Victor Doussot</strong>
+                <div style="font-size:11px; color:var(--color-text-tertiary);">Président MDC</div>
+              </div>
+            </div>
+            <span class="brand-badge">Admin</span>
+          </button>
+
+          <button class="sidebar-item account-choice-btn" data-name="Alexandre M." data-role="Trésorier" data-avatar="AM">
+            <div class="sidebar-item-left">
+              <div class="user-avatar" style="width:28px; height:28px; background:var(--color-apple-blue);">AM</div>
+              <div>
+                <strong style="font-size:13.5px;">Alexandre M.</strong>
+                <div style="font-size:11px; color:var(--color-text-tertiary);">Trésorier MDC</div>
+              </div>
+            </div>
+          </button>
+
+          <button class="sidebar-item account-choice-btn" data-name="Sarah B." data-role="Coordination & Événements" data-avatar="SB">
+            <div class="sidebar-item-left">
+              <div class="user-avatar" style="width:28px; height:28px; background:var(--color-apple-green);">SB</div>
+              <div>
+                <strong style="font-size:13.5px;">Sarah B.</strong>
+                <div style="font-size:11px; color:var(--color-text-tertiary);">Coordination MDC</div>
+              </div>
+            </div>
+          </button>
+
+          <button class="sidebar-item account-choice-btn" data-name="Invité MDC" data-role="Visiteur en lecture" data-avatar="IM">
+            <div class="sidebar-item-left">
+              <div class="user-avatar" style="width:28px; height:28px; background:var(--color-text-tertiary);">IM</div>
+              <div>
+                <strong style="font-size:13.5px;">Invité Maison Du Charlo</strong>
+                <div style="font-size:11px; color:var(--color-text-tertiary);">Accès consultation</div>
+              </div>
+            </div>
+          </button>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="apple-btn" id="btn-google-logout">Déconnexion</button>
+        <button class="apple-btn modal-cancel-btn">Fermer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==========================================
+       MODAL: PARAMÈTRES GOOGLE CLOUD
+       ========================================== -->
+  <div class="modal-overlay" id="modal-settings">
+    <div class="apple-modal">
+      <div class="modal-header">
+        <h3>Configuration Google Suite</h3>
+        <button class="modal-close-btn">&times;</button>
+      </div>
+      <form id="form-settings">
+        <div class="modal-body">
+          <p style="font-size:12.5px; color:var(--color-text-secondary); line-height:1.5;">
+            Pour relier ce site hébergé sur GitHub Pages à votre suite Google (Drive, Agenda, Tâches), renseignez simplement votre identifiant Client OAuth Google (100% gratuit).
+          </p>
+
+          <div class="form-group">
+            <label for="cfg-client-id">Google Client ID (OAuth 2.0)</label>
+            <input type="text" id="cfg-client-id" placeholder="ex: 123456789-abc.apps.googleusercontent.com">
+          </div>
+
+          <div class="form-group">
+            <label for="cfg-api-key">Google API Key (Optionnelle)</label>
+            <input type="password" id="cfg-api-key" placeholder="ex: AIzaSyD...">
+          </div>
+
+          <div class="form-group">
+            <label for="cfg-drive-id">Dossier Google Drive Partagé (Optionnel)</label>
+            <input type="text" id="cfg-drive-id" placeholder="ID du dossier Drive de la MDC">
+          </div>
+
+          <div class="form-group">
+            <label for="cfg-cal-id">ID du Calendrier Partagé (Optionnel)</label>
+            <input type="text" id="cfg-cal-id" placeholder="ex: asso.mdc@gmail.com ou primary">
+          </div>
+
+          <div style="background:var(--color-surface-secondary); padding:12px; border-radius:var(--radius-md); font-size:12px; color:var(--color-text-secondary);">
+            <strong>Guide d'activation rapide en 2 minutes :</strong>
+            <ol style="margin-left:18px; margin-top:6px; display:flex; flex-direction:column; gap:4px;">
+              <li>Allez sur <code>console.cloud.google.com</code></li>
+              <li>Activez les API Drive, Calendar et Tasks</li>
+              <li>Dans Identifiants &gt; ID client OAuth (Application Web), ajoutez l'adresse de votre GitHub Pages dans « Origines JavaScript autorisées »</li>
+            </ol>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="apple-btn" onclick="App.resetAllData()" style="color:var(--color-apple-red);">Réinitialiser</button>
+          <button type="button" class="apple-btn modal-cancel-btn">Annuler</button>
+          <button type="submit" class="apple-btn btn-primary">Enregistrer</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==========================================
+       MODAL: VISUALISEUR DE FICHIER CONFINÉ
+       ========================================== -->
+  <div class="modal-overlay" id="modal-file-viewer">
+    <div class="apple-modal" style="max-width:760px;">
+      <div class="modal-header">
+        <div>
+          <h3 id="modal-file-title">Aperçu du document</h3>
+          <p id="modal-file-author" style="font-size:12px; color:var(--color-text-tertiary); margin-top:2px;">Document confiné</p>
+        </div>
+        <button class="modal-close-btn">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="file-preview-content" id="file-viewer-container">
+          <!-- Injected Preview -->
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="apple-btn modal-cancel-btn">Fermer</button>
+        <button class="apple-btn btn-primary" id="btn-download-file">
+          <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          <span>Télécharger le fichier</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==========================================
+       MODAL: AJOUTER ÉVÉNEMENT CALENDRIER
+       ========================================== -->
+  <div class="modal-overlay" id="modal-add-event">
+    <div class="apple-modal">
+      <div class="modal-header">
+        <h3>Programmer un Événement MDC</h3>
+        <button class="modal-close-btn">&times;</button>
+      </div>
+      <form id="form-add-event">
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="event-title-input">Titre de l'événement</label>
+            <input type="text" id="event-title-input" required placeholder="ex: Soirée MDC / Sortie / Réunion">
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+            <div class="form-group">
+              <label for="event-date-input">Date</label>
+              <input type="date" id="event-date-input" required value="2026-11-20">
+            </div>
+            <div class="form-group">
+              <label for="event-time-input">Horaires</label>
+              <input type="text" id="event-time-input" placeholder="ex: 19:30 - 23:00">
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="event-loc-input">Lieu</label>
+            <input type="text" id="event-loc-input" placeholder="ex: Local MDC / En ligne">
+          </div>
+          <div class="form-group">
+            <label for="event-cat-input">Catégorie</label>
+            <select id="event-cat-input">
+              <option value="party">Fête / Soirée MDC (Doré)</option>
+              <option value="meeting">Réunion & Organisation (Bleu)</option>
+              <option value="trip">Sortie & Activité (Vert)</option>
+              <option value="important">Important / Assemblée (Rouge)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="event-desc-input">Description & Notes</label>
+            <textarea id="event-desc-input" rows="3" placeholder="Détails du programme, ce qu'il faut apporter..."></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="apple-btn modal-cancel-btn">Annuler</button>
+          <button type="submit" class="apple-btn btn-primary">Créer l'événement</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==========================================
+       MODAL: AJOUTER NOTE
+       ========================================== -->
+  <div class="modal-overlay" id="modal-add-note">
+    <div class="apple-modal">
+      <div class="modal-header">
+        <h3>Nouvelle Note / Compte-rendu</h3>
+        <button class="modal-close-btn">&times;</button>
+      </div>
+      <form id="form-add-note">
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="note-title-input">Titre</label>
+            <input type="text" id="note-title-input" required placeholder="ex: Compte-rendu réunion">
+          </div>
+          <div class="form-group">
+            <label for="note-tag-input">Thème / Tag</label>
+            <input type="text" id="note-tag-input" placeholder="ex: Organisation, Événements, Idées">
+          </div>
+          <div class="form-group">
+            <label for="note-content-input">Contenu</label>
+            <textarea id="note-content-input" rows="6" required placeholder="Rédigez la note de l'équipe..."></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="apple-btn modal-cancel-btn">Annuler</button>
+          <button type="submit" class="apple-btn btn-primary">Enregistrer la note</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div class="apple-toast" id="app-toast"></div>
+
+  <!-- Application Logic -->
+  <script src="js/app.js"></script>
+</body>
+</html>
