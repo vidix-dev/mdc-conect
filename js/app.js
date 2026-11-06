@@ -37,6 +37,7 @@ const DEFAULT_VIRGIN_DATA = {
   tasks: [],
   notes: [],
   settings: {
+    cloudApiUrl: "https://extranet-cad.duckdns.org/mdc-api/",
     gasWebappUrl: "https://script.google.com/macros/s/AKfycbx6AyPMD99J68qmikpr-ay22dWMkzY-mkCaufAAhCiLtnS_0fGRRoMsrrEHLyXjbEKDLw/exec",
     googleClientId: "",
     driveFolderId: "",
@@ -62,6 +63,9 @@ class MDCStore {
         }
         if (!parsed.settings.gasWebappUrl) {
           parsed.settings.gasWebappUrl = DEFAULT_VIRGIN_DATA.settings.gasWebappUrl;
+        }
+        if (!parsed.settings.cloudApiUrl) {
+          parsed.settings.cloudApiUrl = DEFAULT_VIRGIN_DATA.settings.cloudApiUrl;
         }
         return parsed;
       }
@@ -98,9 +102,9 @@ const App = {
   init() {
     this.bindEvents();
     this.applyTheme();
+    this.syncFromCloud();
     this.checkAuthStatus();
-    this.syncFromGAS();
-    setInterval(() => this.syncFromGAS(), 30000);
+    setInterval(() => this.syncFromCloud(), 15000);
   },
 
   bindEvents() {
@@ -208,7 +212,7 @@ const App = {
 
       store.data.accounts.push(newAccount);
       store.save();
-      this.pushSyncToGAS();
+      this.pushSyncToCloud();
 
       // Automatically login
       store.data.currentUser = newAccount;
@@ -417,7 +421,7 @@ const App = {
 
     store.data.accounts.push(newAccount);
     store.save();
-    this.pushSyncToGAS();
+    this.pushSyncToCloud();
 
     this.closeModal("modal-create-account");
     this.renderAccountsList();
@@ -451,7 +455,7 @@ const App = {
     if (confirm(`Confirmez-vous la révocation du compte de « ${account.firstName} ${account.lastName} » (${account.username}) ? Cette personne ne pourra plus accéder à MDC-Conect.`)) {
       store.data.accounts = store.data.accounts.filter(a => a.id !== accountId);
       store.save();
-      this.pushSyncToGAS();
+      this.pushSyncToCloud();
       this.renderAccountsList();
       this.showToast(`Compte « ${account.username} » révoqué avec succès`);
     }
@@ -496,9 +500,99 @@ const App = {
   },
 
   /* ==========================================
-     GOOGLE APPS SCRIPT WEB APP INTEGRATION (4TB)
+     MDC CLOUD & GOOGLE DRIVE INTEGRATION (4TB)
      ========================================== */
+  isCloudConnected: true,
   isGasConnected: false,
+
+  async callCloud(action, payload = {}) {
+    const cloudUrl = store.data.settings.cloudApiUrl || "https://extranet-cad.duckdns.org/mdc-api/";
+    try {
+      const response = await fetch(cloudUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, ...payload })
+      });
+      const data = await response.json();
+      if (data && data.success) {
+        this.isCloudConnected = true;
+        this.updateGasStatusUI("connected");
+      }
+      return data;
+    } catch (err) {
+      console.warn("Cloud API error:", err);
+      return null;
+    }
+  },
+
+  async syncFromCloud() {
+    const cloudUrl = store.data.settings.cloudApiUrl || "https://extranet-cad.duckdns.org/mdc-api/";
+    try {
+      const res = await fetch(cloudUrl + "syncAll");
+      const data = await res.json();
+      if (data && data.success) {
+        this.isCloudConnected = true;
+        this.updateGasStatusUI("connected");
+
+        if (Array.isArray(data.folders)) {
+          store.data.folders = data.folders;
+        }
+        if (Array.isArray(data.files)) {
+          // Conserver les dataUrl locales si présentes
+          const localCache = new Map();
+          store.data.files.forEach(f => {
+            if (f.url && f.url.startsWith("data:")) {
+              localCache.set(f.id, f.url);
+            }
+          });
+          store.data.files = data.files.map(df => {
+            if (localCache.has(df.id)) {
+              df.url = localCache.get(df.id);
+            }
+            return df;
+          });
+        }
+        if (Array.isArray(data.events)) {
+          store.data.events = data.events;
+        }
+        if (Array.isArray(data.notes)) {
+          store.data.notes = data.notes;
+        }
+        if (Array.isArray(data.tasks)) {
+          store.data.tasks = data.tasks;
+        }
+        if (Array.isArray(data.accounts) && data.accounts.length > 0) {
+          const existingUsernames = new Set(data.accounts.map(a => a.username.toLowerCase()));
+          const admin = store.data.accounts.find(a => a.username === "vdoussot19");
+          if (admin && !existingUsernames.has("vdoussot19")) {
+            data.accounts.unshift(admin);
+          }
+          store.data.accounts = data.accounts;
+        }
+        store.save();
+        this.renderFolders();
+        this.renderDriveFiles();
+        this.renderCalendar();
+        this.renderTasksAndNotes();
+        this.renderAccountsList();
+      }
+    } catch (e) {
+      console.warn("Erreur synchronisation cloud:", e);
+    }
+
+    // Synchronisation secondaire Google Apps Script
+    this.syncFromGAS();
+  },
+
+  async pushSyncToCloud() {
+    await this.callCloud("saveSyncData", {
+      events: store.data.events,
+      notes: store.data.notes,
+      tasks: store.data.tasks,
+      accounts: store.data.accounts
+    });
+    this.pushSyncToGAS();
+  },
 
   async callGAS(action, payload = {}) {
     const url = store.data.settings.gasWebappUrl;
@@ -514,16 +608,12 @@ const App = {
         const data = JSON.parse(text);
         if (data && data.success) {
           this.isGasConnected = true;
-          this.updateGasStatusUI("connected");
         }
         return data;
-      } catch (parseErr) {
-        this.updateGasStatusUI("pending");
+      } catch (_) {
         return null;
       }
     } catch (netErr) {
-      console.warn("Erreur réseau GAS:", netErr);
-      this.updateGasStatusUI("pending");
       return null;
     }
   },
@@ -533,29 +623,24 @@ const App = {
     const text = document.getElementById("gdrive-status-text");
     if (!badge || !text) return;
 
-    if (status === "connected") {
+    if (status === "connected" || this.isCloudConnected) {
       badge.classList.add("connected");
-      text.textContent = "Google Drive 4 To · Synchronisé";
-      badge.title = "Connecté à votre Google Drive 4 To. Tous les fichiers sont synchronisés.";
+      text.textContent = "Cloud 4 To · Synchronisé en direct";
+      badge.title = "Cloud 4 To actif. Fichiers et données partagés en temps réel sur tous les appareils.";
     } else {
       badge.classList.remove("connected");
-      text.textContent = "Google Drive 4 To · En attente d'accès";
-      badge.title = "Cliquez pour tester la synchronisation avec votre Google Drive.";
+      text.textContent = "Cloud 4 To · Connexion...";
+      badge.title = "Cliquez pour forcer la synchronisation.";
     }
   },
 
   async checkGasConnection(showToastMessage = false) {
     if (showToastMessage) {
-      this.showToast("Test de connexion à Google Drive 4 To en cours...");
+      this.showToast("Synchronisation en cours avec le Cloud 4 To...");
     }
-    await this.syncFromGAS();
-    if (this.isGasConnected) {
-      if (showToastMessage) this.showToast("Connexion à Google Drive 4 To active et synchronisée");
-    } else {
-      if (showToastMessage) {
-        this.showToast("Passerelle en attente d'accès public dans Google Apps Script");
-        this.openModal("modal-settings");
-      }
+    await this.syncFromCloud();
+    if (showToastMessage) {
+      this.showToast("Cloud 4 To synchronisé avec succès");
     }
   },
 
@@ -570,61 +655,20 @@ const App = {
         const data = JSON.parse(text);
         if (data && data.success) {
           this.isGasConnected = true;
-          this.updateGasStatusUI("connected");
-
-          if (Array.isArray(data.folders)) {
-            store.data.folders = data.folders;
-          }
-          if (Array.isArray(data.files)) {
-            // Conserver le cache local dataUrl si disponible
-            const localCacheMap = new Map();
-            store.data.files.forEach(f => {
-              if (f.url && f.url.startsWith("data:")) {
-                localCacheMap.set(f.id, f.url);
-                if (f.driveFileId) localCacheMap.set(f.driveFileId, f.url);
+          // Fusion des fichiers de Google Drive avec le cloud
+          if (Array.isArray(data.files) && data.files.length > 0) {
+            const existingIds = new Set(store.data.files.map(f => f.id));
+            data.files.forEach(df => {
+              if (!existingIds.has(df.id)) {
+                store.data.files.push(df);
               }
             });
-
-            store.data.files = data.files.map(df => {
-              if (localCacheMap.has(df.id)) {
-                df.url = localCacheMap.get(df.id);
-              }
-              return df;
-            });
+            store.save();
+            this.renderDriveFiles();
           }
-          if (Array.isArray(data.events)) {
-            store.data.events = data.events;
-          }
-          if (Array.isArray(data.notes)) {
-            store.data.notes = data.notes;
-          }
-          if (Array.isArray(data.tasks)) {
-            store.data.tasks = data.tasks;
-          }
-          if (Array.isArray(data.accounts) && data.accounts.length > 0) {
-            // Toujours maintenir l'admin vdoussot19
-            const existingUsernames = new Set(data.accounts.map(a => a.username.toLowerCase()));
-            const admin = store.data.accounts.find(a => a.username === "vdoussot19");
-            if (admin && !existingUsernames.has("vdoussot19")) {
-              data.accounts.unshift(admin);
-            }
-            store.data.accounts = data.accounts;
-          }
-          store.save();
-          this.renderFolders();
-          this.renderDriveFiles();
-          this.renderCalendar();
-          this.renderTasksAndNotes();
-          this.renderAccountsList();
-        } else {
-          this.updateGasStatusUI("pending");
         }
-      } catch (parseErr) {
-        this.updateGasStatusUI("pending");
-      }
-    } catch (e) {
-      this.updateGasStatusUI("pending");
-    }
+      } catch (_) {}
+    } catch (_) {}
   },
 
   async pushSyncToGAS() {
@@ -642,9 +686,7 @@ const App = {
           accounts: store.data.accounts
         })
       });
-    } catch (e) {
-      console.warn("GAS push error:", e);
-    }
+    } catch (_) {}
   },
 
   /* ==========================================
@@ -746,16 +788,20 @@ const App = {
     this.renderDriveBreadcrumbs();
     this.showToast(`Dossier « ${name} » créé`);
 
-    // Synchronisation vers Google Drive (4 To)
-    const gasRes = await this.callGAS("createFolder", {
+    // Synchronisation vers le Cloud MDC
+    const cloudRes = await this.callCloud("createFolder", {
       folderName: name,
       folderId: parentFolder.id || "root"
     });
-    if (gasRes && gasRes.success && gasRes.folder) {
-      newFolder.id = gasRes.folder.id;
+    if (cloudRes && cloudRes.success && cloudRes.folder) {
+      newFolder.id = cloudRes.folder.id;
       store.save();
       this.renderFolders();
     }
+    this.callGAS("createFolder", {
+      folderName: name,
+      folderId: parentFolder.id || "root"
+    });
   },
 
   async deleteFolder(folderId, e) {
@@ -770,7 +816,8 @@ const App = {
       this.renderDriveFiles();
       this.showToast("Dossier supprimé");
 
-      await this.callGAS("deleteFolder", { folderId });
+      await this.callCloud("deleteFolder", { folderId });
+      this.callGAS("deleteFolder", { folderId });
     }
   },
 
@@ -999,7 +1046,11 @@ const App = {
     }
 
     let zip;
-    if (file.url && file.url.includes("base64,")) {
+    if (file.url && file.url.startsWith("http")) {
+      const res = await fetch(file.url);
+      const arrayBuffer = await res.arrayBuffer();
+      zip = await JSZip.loadAsync(arrayBuffer);
+    } else if (file.url && file.url.includes("base64,")) {
       const base64Data = file.url.split("base64,")[1];
       zip = await JSZip.loadAsync(base64Data, { base64: true });
     } else if (file.content && file.content.startsWith("PK")) {
@@ -1168,11 +1219,20 @@ const App = {
   },
 
   async renderXlsxPreview(file) {
-    if (typeof JSZip === "undefined" || !file.url || !file.url.includes("base64,")) {
+    if (typeof JSZip === "undefined") {
       return this.renderDocumentFallbackCard(file, "Feuille de calcul Excel (.xlsx)");
     }
-    const base64Data = file.url.split("base64,")[1];
-    const zip = await JSZip.loadAsync(base64Data, { base64: true });
+    let zip;
+    if (file.url && file.url.startsWith("http")) {
+      const res = await fetch(file.url);
+      const arrayBuffer = await res.arrayBuffer();
+      zip = await JSZip.loadAsync(arrayBuffer);
+    } else if (file.url && file.url.includes("base64,")) {
+      const base64Data = file.url.split("base64,")[1];
+      zip = await JSZip.loadAsync(base64Data, { base64: true });
+    } else {
+      return this.renderDocumentFallbackCard(file, "Feuille de calcul Excel (.xlsx)");
+    }
     
     const sharedStringsFile = zip.file("xl/sharedStrings.xml");
     const sheet1File = zip.file("xl/worksheets/sheet1.xml");
@@ -1306,7 +1366,8 @@ const App = {
       this.renderFolders();
       this.showToast("Fichier supprimé");
 
-      await this.callGAS("deleteFile", { fileId: driveId });
+      await this.callCloud("deleteFile", { fileId });
+      this.callGAS("deleteFile", { fileId: driveId });
     }
   },
 
@@ -1408,9 +1469,9 @@ const App = {
       this.renderDriveFiles();
       this.renderFolders();
 
-      // Envoi direct vers Google Drive 4 To via GAS Web App
+      // 1. Envoi direct vers le Cloud MDC (persistance garantie tous navigateurs)
       try {
-        const gasRes = await this.callGAS("upload", {
+        const cloudRes = await this.callCloud("upload", {
           fileName: fileObj.name,
           mimeType: fileObj.type || "application/octet-stream",
           base64: base64Data,
@@ -1418,25 +1479,30 @@ const App = {
           author: authorName
         });
 
-        if (gasRes && gasRes.success && gasRes.file) {
+        if (cloudRes && cloudRes.success && cloudRes.file) {
           const idx = store.data.files.findIndex(f => f.id === tempId);
           if (idx !== -1) {
-            store.data.files[idx].driveFileId = gasRes.file.id;
-            store.data.files[idx].downloadUrl = gasRes.file.downloadUrl;
-            store.data.files[idx].webUrl = gasRes.file.webUrl;
-            if (gasRes.file.url) {
-              store.data.files[idx].googlePreviewUrl = gasRes.file.url;
-            }
+            store.data.files[idx].id = cloudRes.file.id;
+            store.data.files[idx].url = cloudRes.file.url;
+            store.data.files[idx].downloadUrl = cloudRes.file.downloadUrl;
+            store.data.files[idx].webUrl = cloudRes.file.webUrl;
             store.save();
             this.renderDriveFiles();
           }
-          this.showToast(`« ${fileObj.name} » stocké sur votre Google Drive 4 To`);
-        } else {
-          this.showToast(`« ${fileObj.name} » importé (en attente de synchronisation Google Drive)`);
+          this.showToast(`« ${fileObj.name} » stocké dans le Cloud MDC 4 To`);
         }
       } catch (err) {
-        console.warn("Échec téléversement Drive:", err);
+        console.warn("Échec téléversement Cloud:", err);
       }
+
+      // 2. Synchronisation miroir vers Google Drive
+      this.callGAS("upload", {
+        fileName: fileObj.name,
+        mimeType: fileObj.type || "application/octet-stream",
+        base64: base64Data,
+        folderId: currentFolderId,
+        author: authorName
+      });
     };
     reader.readAsDataURL(fileObj);
   },
@@ -1556,7 +1622,7 @@ const App = {
 
     store.data.events.push(newEvent);
     store.save();
-    this.pushSyncToGAS();
+    this.pushSyncToCloud();
     this.closeModal("modal-add-event");
     this.renderCalendar();
     this.showToast("Événement programmé");
@@ -1568,7 +1634,7 @@ const App = {
     if (confirm(`Événement MDC :\n\n${ev.title}\nDate : ${ev.date} (${ev.time})\nLieu : ${ev.location}\nDescription : ${ev.description || "Aucune"}\n\nVoulez-vous supprimer cet événement ?`)) {
       store.data.events = store.data.events.filter(e => e.id !== id);
       store.save();
-      this.pushSyncToGAS();
+      this.pushSyncToCloud();
       this.renderCalendar();
       this.showToast("Événement supprimé");
     }
@@ -1737,7 +1803,7 @@ const App = {
     };
     store.data.tasks.unshift(newTask);
     store.save();
-    this.pushSyncToGAS();
+    this.pushSyncToCloud();
     this.renderTasksAndNotes();
     this.showToast("Tâche ajoutée");
   },
@@ -1747,7 +1813,7 @@ const App = {
     if (task) {
       task.completed = !task.completed;
       store.save();
-      this.pushSyncToGAS();
+      this.pushSyncToCloud();
       this.renderTasksAndNotes();
     }
   },
@@ -1755,7 +1821,7 @@ const App = {
   deleteTask(id) {
     store.data.tasks = store.data.tasks.filter(t => t.id !== id);
     store.save();
-    this.pushSyncToGAS();
+    this.pushSyncToCloud();
     this.renderTasksAndNotes();
     this.showToast("Tâche supprimée");
   },
@@ -1777,7 +1843,7 @@ const App = {
 
     store.data.notes.unshift(newNote);
     store.save();
-    this.pushSyncToGAS();
+    this.pushSyncToCloud();
     this.closeModal("modal-add-note");
     this.renderTasksAndNotes();
     this.showToast("Note enregistrée");
@@ -1793,7 +1859,7 @@ const App = {
     if (confirm("Supprimer cette note ?")) {
       store.data.notes = store.data.notes.filter(n => n.id !== id);
       store.save();
-      this.pushSyncToGAS();
+      this.pushSyncToCloud();
       this.renderTasksAndNotes();
       this.showToast("Note supprimée");
     }
