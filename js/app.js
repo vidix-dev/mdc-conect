@@ -661,13 +661,7 @@ const App = {
 
     const baseUrl = (store.data.settings.cloudApiUrl || "https://extranet-cad.duckdns.org/mdc-api/").replace(/\/?$/, "/");
     try {
-      const res = await fetch(`${baseUrl}syncAll?_t=${Date.now()}`, {
-        cache: "no-store",
-        headers: {
-          "Cache-Control": "no-cache, no-store, must-revalidate",
-          "Pragma": "no-cache"
-        }
-      });
+      const res = await fetch(`${baseUrl}syncAll?_t=${Date.now()}`);
       const data = await res.json();
       if (data && data.success) {
         if (Array.isArray(data.folders)) store.data.folders = data.folders;
