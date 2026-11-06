@@ -1025,8 +1025,24 @@ const App = {
 
     // 4. PDF
     if (file.type === "pdf" || ext === "pdf") {
-      if (file.url && (file.url.startsWith("http") || file.url.startsWith("data:"))) {
+      container.innerHTML = `
+        <div style="text-align:center; padding:48px 20px; color:var(--color-text-secondary);">
+          <div class="apple-spinner" style="margin:0 auto 16px;"></div>
+          <p style="font-size:14px; font-weight:500;">Chargement du document PDF...</p>
+        </div>
+      `;
+      if (file.url && file.url.startsWith("data:")) {
         container.innerHTML = `<iframe src="${file.url}" style="width:100%; height:550px; border:none; border-radius:12px; background:#fff;"></iframe>`;
+      } else if (file.url && file.url.startsWith("http")) {
+        try {
+          const res = await fetch(file.url);
+          const blob = await res.blob();
+          const blobUrl = URL.createObjectURL(blob);
+          container.innerHTML = `<iframe src="${blobUrl}" style="width:100%; height:550px; border:none; border-radius:12px; background:#fff;"></iframe>`;
+        } catch (err) {
+          console.warn("Chargement blob PDF échoué, rendu direct:", err);
+          container.innerHTML = `<iframe src="${file.url}" style="width:100%; height:550px; border:none; border-radius:12px; background:#fff;"></iframe>`;
+        }
       } else {
         container.innerHTML = this.renderDocumentFallbackCard(file, "Document PDF");
       }
