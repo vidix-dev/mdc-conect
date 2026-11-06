@@ -968,39 +968,73 @@ const App = {
       downloadBtn.onclick = () => this.downloadSingleFile(file.id);
     }
 
-    const openGdriveBtn = document.getElementById("btn-open-gdrive");
-    if (openGdriveBtn) {
-      if (file.webUrl) {
-        openGdriveBtn.style.display = "inline-flex";
-        openGdriveBtn.onclick = () => window.open(file.webUrl, "_blank");
+    const openNewTabBtn = document.getElementById("btn-open-new-tab") || document.getElementById("btn-open-gdrive");
+    if (openNewTabBtn) {
+      const targetUrl = file.url || file.webUrl || file.downloadUrl;
+      if (targetUrl && (targetUrl.startsWith("http") || targetUrl.startsWith("data:"))) {
+        openNewTabBtn.style.display = "inline-flex";
+        openNewTabBtn.onclick = () => window.open(targetUrl, "_blank");
       } else if (file.driveFileId) {
-        openGdriveBtn.style.display = "inline-flex";
-        openGdriveBtn.onclick = () => window.open("https://drive.google.com/file/d/" + file.driveFileId + "/view", "_blank");
+        openNewTabBtn.style.display = "inline-flex";
+        openNewTabBtn.onclick = () => window.open("https://drive.google.com/file/d/" + file.driveFileId + "/view", "_blank");
       } else {
-        openGdriveBtn.style.display = "none";
+        openNewTabBtn.style.display = "none";
       }
     }
 
     this.openModal("modal-file-viewer");
 
     const ext = (file.name.split('.').pop() || "").toLowerCase();
-    const drivePreviewUrl = file.googlePreviewUrl || (file.url && file.url.startsWith("https://drive.google.com") ? file.url : (file.driveFileId ? `https://drive.google.com/file/d/${file.driveFileId}/preview` : null));
 
-    if (file.type === "image") {
-      container.innerHTML = `<img src="${file.url || 'assets/logo.jpg'}" alt="${file.name}">`;
-    } else if (file.type === "video") {
-      container.innerHTML = `<video controls class="apple-video-player" src="${file.url || ''}"><p>Aperçu vidéo</p></video>`;
-    } else if (file.type === "audio") {
-      container.innerHTML = `<audio controls class="apple-audio-player" src="${file.url || ''}"></audio>`;
-    } else if (file.type === "pdf") {
-      if (file.url && file.url.startsWith("data:")) {
-        container.innerHTML = `<iframe src="${file.url}" style="width:100%; height:540px; border:none; border-radius:12px; background:#fff;"></iframe>`;
-      } else if (drivePreviewUrl) {
-        container.innerHTML = `<iframe src="${drivePreviewUrl}" style="width:100%; height:540px; border:none; border-radius:12px; background:#fff;"></iframe>`;
+    // 1. Images
+    if (file.type === "image" || ["png", "jpg", "jpeg", "webp", "gif", "svg", "bmp", "ico"].includes(ext)) {
+      container.innerHTML = `
+        <div style="display:flex; align-items:center; justify-content:center; padding:16px; min-height:320px; max-height:560px; overflow:auto;">
+          <img src="${file.url || 'assets/logo.jpg'}" alt="${this.escapeHTML(file.name)}" style="max-width:100%; max-height:520px; object-fit:contain; border-radius:10px; box-shadow:0 10px 30px rgba(0,0,0,0.12);">
+        </div>
+      `;
+      return;
+    }
+
+    // 2. Video
+    if (file.type === "video" || ["mp4", "webm", "mov", "ogg", "m4v"].includes(ext)) {
+      container.innerHTML = `
+        <div style="display:flex; justify-content:center; align-items:center; padding:16px; background:#000; border-radius:12px;">
+          <video controls playsinline class="apple-video-player" src="${file.url || ''}" style="max-width:100%; max-height:520px; border-radius:8px;">
+            <p>Votre navigateur ne supporte pas la lecture vidéo.</p>
+          </video>
+        </div>
+      `;
+      return;
+    }
+
+    // 3. Audio
+    if (file.type === "audio" || ["mp3", "wav", "ogg", "m4a", "aac", "flac"].includes(ext)) {
+      container.innerHTML = `
+        <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding:48px 24px; text-align:center;">
+          <div style="width:64px; height:64px; border-radius:16px; background:var(--color-bg-secondary); display:flex; align-items:center; justify-content:center; margin-bottom:20px; border:1px solid var(--color-border);">
+            <svg width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+          </div>
+          <h3 style="font-size:16px; font-weight:600; margin-bottom:6px;">${this.escapeHTML(file.name)}</h3>
+          <p style="font-size:13px; color:var(--color-text-tertiary); margin-bottom:24px;">Lecture audio intégrée · ${file.size}</p>
+          <audio controls class="apple-audio-player" src="${file.url || ''}" style="width:100%; max-width:440px;"></audio>
+        </div>
+      `;
+      return;
+    }
+
+    // 4. PDF
+    if (file.type === "pdf" || ext === "pdf") {
+      if (file.url && (file.url.startsWith("http") || file.url.startsWith("data:"))) {
+        container.innerHTML = `<iframe src="${file.url}" style="width:100%; height:550px; border:none; border-radius:12px; background:#fff;"></iframe>`;
       } else {
         container.innerHTML = this.renderDocumentFallbackCard(file, "Document PDF");
       }
-    } else if (ext === "docx") {
+      return;
+    }
+
+    // 5. Word (.docx)
+    if (ext === "docx") {
       container.innerHTML = `
         <div style="text-align:center; padding:48px 20px; color:var(--color-text-secondary);">
           <div class="apple-spinner" style="margin:0 auto 16px;"></div>
@@ -1012,32 +1046,75 @@ const App = {
         container.innerHTML = rendered;
       } catch (err) {
         console.error("Erreur lecture DOCX:", err);
-        if (drivePreviewUrl) {
-          container.innerHTML = `<iframe src="${drivePreviewUrl}" style="width:100%; height:540px; border:none; border-radius:12px; background:#fff;"></iframe>`;
+        if (file.url && file.url.startsWith("http")) {
+          container.innerHTML = `<iframe src="https://docs.google.com/viewer?url=${encodeURIComponent(file.url)}&embedded=true" style="width:100%; height:550px; border:none; border-radius:12px; background:#fff;"></iframe>`;
         } else {
           container.innerHTML = this.renderDocumentFallbackCard(file, "Document Microsoft Word (.docx)");
         }
       }
-    } else if (ext === "xlsx" || ext === "xls") {
+      return;
+    }
+
+    // 6. Excel (.xlsx, .xls)
+    if (ext === "xlsx" || ext === "xls") {
+      container.innerHTML = `
+        <div style="text-align:center; padding:48px 20px; color:var(--color-text-secondary);">
+          <div class="apple-spinner" style="margin:0 auto 16px;"></div>
+          <p style="font-size:14px; font-weight:500;">Lecture de la feuille de calcul Excel...</p>
+        </div>
+      `;
       try {
         const rendered = await this.renderXlsxPreview(file);
         container.innerHTML = rendered;
       } catch (err) {
-        if (drivePreviewUrl) {
-          container.innerHTML = `<iframe src="${drivePreviewUrl}" style="width:100%; height:540px; border:none; border-radius:12px; background:#fff;"></iframe>`;
+        console.error("Erreur lecture XLSX:", err);
+        if (file.url && file.url.startsWith("http")) {
+          container.innerHTML = `<iframe src="https://docs.google.com/viewer?url=${encodeURIComponent(file.url)}&embedded=true" style="width:100%; height:550px; border:none; border-radius:12px; background:#fff;"></iframe>`;
         } else {
           container.innerHTML = this.renderDocumentFallbackCard(file, "Feuille de calcul Excel (.xlsx)");
         }
       }
-    } else if (file.type === "spreadsheet" && file.content && (file.content.includes("\t") || file.content.includes(","))) {
-      container.innerHTML = this.renderCsvPreview(file.content);
-    } else if (drivePreviewUrl && (!file.url || !file.url.startsWith("data:"))) {
-      container.innerHTML = `<iframe src="${drivePreviewUrl}" style="width:100%; height:540px; border:none; border-radius:12px; background:#fff;"></iframe>`;
-    } else if (file.content && !file.content.startsWith("PK")) {
-      container.innerHTML = `<div class="text-viewer-box">${this.escapeHTML(file.content)}</div>`;
-    } else {
-      container.innerHTML = this.renderDocumentFallbackCard(file, ext ? ext.toUpperCase() : "DOCUMENT");
+      return;
     }
+
+    // 7. CSV / Tabular
+    if (ext === "csv" || (file.type === "spreadsheet" && file.content && (file.content.includes("\t") || file.content.includes(",")))) {
+      if (file.content) {
+        container.innerHTML = this.renderCsvPreview(file.content);
+      } else if (file.url && file.url.startsWith("http")) {
+        try {
+          const res = await fetch(file.url);
+          const txt = await res.text();
+          container.innerHTML = this.renderCsvPreview(txt);
+        } catch (_) {
+          container.innerHTML = this.renderDocumentFallbackCard(file, "Fichier CSV");
+        }
+      } else {
+        container.innerHTML = this.renderDocumentFallbackCard(file, "Fichier CSV");
+      }
+      return;
+    }
+
+    // 8. Plain text, markdown, JSON, scripts
+    if (["txt", "md", "markdown", "json", "js", "html", "css", "py", "sh", "xml", "yaml", "yml", "log"].includes(ext) || (file.content && !file.content.startsWith("PK"))) {
+      if (file.content && !file.content.startsWith("PK")) {
+        container.innerHTML = `<div class="text-viewer-box">${this.escapeHTML(file.content)}</div>`;
+      } else if (file.url && file.url.startsWith("http")) {
+        try {
+          const res = await fetch(file.url);
+          const txt = await res.text();
+          container.innerHTML = `<div class="text-viewer-box">${this.escapeHTML(txt)}</div>`;
+        } catch (_) {
+          container.innerHTML = this.renderDocumentFallbackCard(file, ext.toUpperCase());
+        }
+      } else {
+        container.innerHTML = this.renderDocumentFallbackCard(file, ext ? ext.toUpperCase() : "DOCUMENT");
+      }
+      return;
+    }
+
+    // 9. Fallback
+    container.innerHTML = this.renderDocumentFallbackCard(file, ext ? ext.toUpperCase() : "DOCUMENT");
   },
 
   async renderDocxPreview(file) {
@@ -1304,6 +1381,7 @@ const App = {
 
   renderDocumentFallbackCard(file, label) {
     const ext = (file.name.split('.').pop() || "").toUpperCase();
+    const hasHttpUrl = file.url && file.url.startsWith("http");
     return `
       <div class="apple-doc-fallback-card">
         <div class="apple-doc-fallback-icon">
@@ -1316,13 +1394,19 @@ const App = {
           <span class="apple-doc-fallback-ext">${ext}</span>
         </div>
         <h3 class="apple-doc-fallback-title">${this.escapeHTML(file.name)}</h3>
-        <p class="apple-doc-fallback-meta">${label || 'Document confiné'} · ${file.size} · Ajouté par ${file.author || 'MDC'}</p>
-        <p class="apple-doc-fallback-desc">Ce fichier est stocké de manière sécurisée et confinée sur MDC-Conect. Vous pouvez l'exporter ou l'ouvrir directement dans son application dédiée.</p>
-        <div class="apple-doc-fallback-actions">
+        <p class="apple-doc-fallback-meta">${label || 'Document officiel'} · ${file.size} · Ajouté par ${file.author || 'MDC'}</p>
+        <p class="apple-doc-fallback-desc">Ce fichier est stocké sur le Cloud MDC. Vous pouvez le télécharger ou l'ouvrir directement dans son application dédiée.</p>
+        <div class="apple-doc-fallback-actions" style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
           <button class="apple-btn btn-primary" onclick="App.downloadSingleFile('${file.id}')">
             <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            <span>Télécharger / Ouvrir ${ext}</span>
+            <span>Télécharger ${ext}</span>
           </button>
+          ${hasHttpUrl ? `
+            <button class="apple-btn" onclick="window.open('${file.url}', '_blank')">
+              <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+              <span>Ouvrir dans un nouvel onglet</span>
+            </button>
+          ` : ''}
         </div>
       </div>
     `;
@@ -1335,6 +1419,14 @@ const App = {
 
     if (file.downloadUrl) {
       window.open(file.downloadUrl, "_blank");
+    } else if (file.url && file.url.startsWith("http")) {
+      const a = document.createElement("a");
+      a.href = file.url;
+      a.download = file.name;
+      a.target = "_blank";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
     } else if (file.driveFileId) {
       window.open("https://drive.google.com/uc?export=download&id=" + file.driveFileId, "_blank");
     } else if (file.url && file.url.startsWith("data:")) {
@@ -1439,7 +1531,7 @@ const App = {
     const currentFolderId = currentFolder.id || "root";
     const authorName = store.data.currentUser ? `${store.data.currentUser.firstName} ${store.data.currentUser.lastName.charAt(0)}.` : "Membre MDC";
 
-    this.showToast(`Envoi de « ${fileObj.name} » vers Google Drive (4 To)...`);
+    this.showToast(`Envoi de « ${fileObj.name} » vers le Cloud MDC...`);
 
     const reader = new FileReader();
     reader.onload = async (e) => {
