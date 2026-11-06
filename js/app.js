@@ -149,7 +149,9 @@ const DEFAULT_MDC_DATA = {
     googleClientId: "",
     googleApiKey: "",
     driveFolderId: "",
-    calendarId: ""
+    driveFolderUrl: "",
+    calendarId: "",
+    storageTotal: "4 To"
   }
 };
 
