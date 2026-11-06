@@ -1660,3 +1660,252 @@ a {
 .apple-table tr:hover td {
   background-color: var(--color-surface-hover);
 }
+
+/* ========================================================
+   APPLE LOCK SCREEN & ACCOUNT MANAGEMENT STYLES
+   ======================================================== */
+.lock-screen-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 5000;
+  background-color: var(--color-canvas);
+  background-image: radial-gradient(circle at 50% 30%, rgba(212, 175, 55, 0.08), transparent 70%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  opacity: 1;
+  transition: opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.25s;
+  visibility: visible;
+}
+
+.lock-screen-overlay.hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.lock-card {
+  width: 100%;
+  max-width: 380px;
+  background-color: var(--color-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-modal);
+  padding: 32px 28px;
+  box-shadow: var(--shadow-modal);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.lock-logo {
+  height: 48px;
+  width: auto;
+  margin-bottom: 16px;
+  object-fit: contain;
+}
+
+.lock-title {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin-bottom: 6px;
+}
+
+.lock-subtitle {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  margin-bottom: 24px;
+  line-height: 1.4;
+}
+
+.lock-form {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.lock-input-group {
+  position: relative;
+  width: 100%;
+  text-align: left;
+}
+
+.lock-input-group label {
+  display: block;
+  font-size: 11.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-tertiary);
+  margin-bottom: 6px;
+}
+
+.lock-input {
+  width: 100%;
+  padding: 11px 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  background-color: var(--color-surface-secondary);
+  font-size: 14px;
+  color: var(--color-text-primary);
+  outline: none;
+  transition: all 0.15s ease;
+  font-family: var(--font-system);
+}
+
+.lock-input:focus {
+  background-color: var(--color-surface);
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.15);
+}
+
+.lock-btn {
+  width: 100%;
+  padding: 11px;
+  border-radius: var(--radius-md);
+  border: none;
+  background-color: var(--color-apple-blue);
+  color: white;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s ease, transform 0.1s ease;
+  margin-top: 4px;
+}
+
+.lock-btn:hover {
+  opacity: 0.93;
+}
+
+.lock-btn:active {
+  transform: scale(0.99);
+}
+
+.lock-helper {
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+  margin-top: 14px;
+}
+
+.lock-helper a {
+  color: var(--color-apple-blue);
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.lock-helper a:hover {
+  text-decoration: underline;
+}
+
+/* Empty Virgin States */
+.virgin-state-box {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 64px 20px;
+  color: var(--color-text-tertiary);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.virgin-state-icon {
+  width: 48px;
+  height: 48px;
+  stroke-width: 1.25;
+  color: var(--color-text-tertiary);
+  margin-bottom: 12px;
+  opacity: 0.5;
+}
+
+.virgin-state-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  margin-bottom: 4px;
+}
+
+.virgin-state-desc {
+  font-size: 13px;
+  color: var(--color-text-tertiary);
+  max-width: 380px;
+}
+
+/* Accounts Directory Table / List */
+.accounts-table-card {
+  background-color: var(--color-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-card);
+  padding: 20px;
+  box-shadow: var(--shadow-sm);
+  overflow-x: auto;
+}
+
+.account-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+  transition: background-color 0.15s ease;
+}
+
+.account-row:last-child {
+  border-bottom: none;
+}
+
+.account-row:hover {
+  background-color: var(--color-surface-hover);
+}
+
+.account-col-main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.account-avatar-circle {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--color-surface-secondary);
+  border: 1px solid var(--border-subtle);
+  color: var(--color-text-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.account-details h4 {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.account-meta-line {
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.account-code-pill {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-secondary);
+  color: var(--color-text-secondary);
+  border: 1px solid var(--border-subtle);
+}

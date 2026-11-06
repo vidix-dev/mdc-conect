@@ -3,25 +3,44 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>MDC-Conect · Cloud 4 To Maison Du Charlo</title>
+  <title>MDC-Conect · Maison Du Charlo</title>
   
   <!-- Apple Web App & Meta -->
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="MDC-Conect">
-  <meta name="description" content="Espace cloud collaboratif 4 To pour la Maison Du Charlo. Importez, exportez et visionnez vos fichiers, calendrier et notes dans un environnement Apple épuré.">
+  <meta name="description" content="Portail collaboratif 4 To pour la Maison Du Charlo. Gestion de fichiers, agenda et notes dans un environnement confiné.">
   <link rel="icon" type="image/jpeg" href="assets/logo.jpg">
   <link rel="apple-touch-icon" href="assets/logo.jpg">
 
   <!-- Apple Theme Stylesheet -->
   <link rel="stylesheet" href="css/apple-theme.css">
 
-  <!-- Google Identity Services (GIS) for Google Suite OAuth2 -->
-  <script src="https://accounts.google.com/gsi/client" async defer></script>
   <!-- JSZip for Client-side Folder & Notes Zip Exports -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 </head>
 <body>
+
+  <!-- Apple Lock Screen / Login Modal Overlay -->
+  <div class="lock-screen-overlay" id="lock-screen-overlay">
+    <div class="lock-card">
+      <img id="lock-screen-logo" src="assets/logo.jpg" alt="Maison Du Charlo" class="lock-logo">
+      <h2 class="lock-title">MDC-Conect</h2>
+      <p class="lock-subtitle">Portail collaboratif 4 To · Maison Du Charlo</p>
+
+      <form class="lock-form" id="form-lock-login">
+        <div class="lock-input-group">
+          <label for="lock-username-input">Identifiant de connexion</label>
+          <input type="text" id="lock-username-input" class="lock-input" placeholder="ex : vdoussot19" autocomplete="username" required>
+        </div>
+        <button type="submit" class="lock-btn">Accéder à l'espace</button>
+      </form>
+
+      <div class="lock-helper">
+        Nouveau membre ? <a onclick="App.openModal('modal-create-account')">Créer un compte</a>
+      </div>
+    </div>
+  </div>
 
   <!-- Translucent Top Header (Apple macOS / iPadOS Style) -->
   <header class="apple-header">
@@ -48,7 +67,7 @@
       </button>
       <button class="nav-tab" data-tab="team">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
-        <span>Membres</span>
+        <span>Comptes</span>
       </button>
     </nav>
 
@@ -61,9 +80,9 @@
       </div>
 
       <!-- Sync Status Pill -->
-      <div class="status-indicator" title="État de connexion cloud">
-        <span class="status-dot" id="status-dot"></span>
-        <span id="status-text">Espace MDC 4 To</span>
+      <div class="status-indicator" title="Compte actif">
+        <span class="status-dot"></span>
+        <span id="status-text">Connecté</span>
       </div>
 
       <!-- Dark / Light Mode Toggle -->
@@ -76,11 +95,16 @@
         <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
       </button>
 
-      <!-- User Profile & Account Switcher -->
-      <button class="user-profile-btn" onclick="App.openModal('modal-account')" title="Gérer le compte et les accès">
-        <div class="user-avatar" id="user-avatar-display">VD</div>
-        <span class="user-name-label" id="user-name-display">Victor Doussot</span>
-      </button>
+      <!-- User Profile Badge & Logout -->
+      <div style="display:flex; align-items:center; gap:6px;">
+        <div class="user-profile-btn" onclick="App.switchTab('team')">
+          <div class="user-avatar" id="user-avatar-display">VD</div>
+          <span class="user-name-label" id="user-name-display">Victor Doussot</span>
+        </div>
+        <button class="icon-btn" id="btn-user-logout" title="Se déconnecter" style="width:32px; height:32px;">
+          <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        </button>
+      </div>
     </div>
   </header>
 
@@ -88,13 +112,13 @@
   <main class="app-container">
 
     <!-- ==========================================
-         VIEW 1: FICHIERS (DOSSIERS & FICHIERS 4 TO)
+         VIEW 1: FICHIERS (ESPACE 4 TO)
          ========================================== -->
     <section id="view-drive" class="view-section active">
       <div class="view-header">
         <div class="view-title-group">
-          <h2>Cloud Documents MDC (4 To)</h2>
-          <p class="view-subtitle">Importez, exportez et visionnez les fichiers directement dans vos dossiers</p>
+          <h2>Documents & Fichiers</h2>
+          <p class="view-subtitle">Stockage 4 To Maison Du Charlo · Importation, exportation et consultation directe</p>
         </div>
         <div class="action-bar">
           <input type="file" id="file-picker-hidden" multiple style="display:none;">
@@ -102,7 +126,7 @@
             <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg>
             <span>Nouveau dossier</span>
           </button>
-          <button class="apple-btn" id="btn-export-folder-zip" title="Télécharger tous les fichiers du dossier actuel dans une archive ZIP">
+          <button class="apple-btn" id="btn-export-folder-zip" title="Télécharger l'intégralité du dossier en archive ZIP">
             <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
             <span>Exporter le dossier (.ZIP)</span>
           </button>
@@ -117,11 +141,11 @@
         <!-- Sidebar Navigation -->
         <aside class="drive-sidebar">
           <div class="sidebar-category">
-            <div class="sidebar-label">Espaces MDC</div>
+            <div class="sidebar-label">Espaces</div>
             <button class="sidebar-item active" onclick="App.setFileFilter('all', this)">
               <div class="sidebar-item-left">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
-                <span>Tous les fichiers</span>
+                <span>Tous les documents</span>
               </div>
             </button>
             <button class="sidebar-item" onclick="App.setFileFilter('documents', this)">
@@ -148,11 +172,11 @@
           <div class="storage-widget">
             <div class="sidebar-label">Capacité Cloud MDC</div>
             <div class="storage-bar-track">
-              <div class="storage-bar-fill" style="width: 18%;"></div>
+              <div class="storage-bar-fill" style="width: 8%;"></div>
             </div>
             <div class="storage-text">
-              <span id="storage-used-label">24.5 Go occupés</span>
-              <span id="storage-total-label">4 To partagés</span>
+              <span id="storage-used-label">Espace actif</span>
+              <span id="storage-total-label">4 To alloués</span>
             </div>
           </div>
         </aside>
@@ -167,7 +191,7 @@
           </div>
 
           <!-- Folders Grid -->
-          <div class="folders-section" id="folders-wrapper">
+          <div class="folders-section" id="folders-wrapper" style="display:none;">
             <div class="section-subhead">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M19.5 21a3 3 0 003-3v-4.5a3 3 0 00-3-3h-7.5l-2-2H4.5A3 3 0 001.5 11.5v6.5a3 3 0 003 3h15z"/></svg>
               <span>Dossiers</span>
@@ -180,40 +204,40 @@
           <!-- Files Section Subhead -->
           <div class="section-subhead">
             <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/></svg>
-            <span>Fichiers du dossier</span>
+            <span>Fichiers</span>
           </div>
 
           <!-- Files Grid -->
           <div class="files-grid" id="files-grid-container">
-            <!-- Rendered by JS -->
+            <!-- Rendered by JS (Clean virgin state initially) -->
           </div>
 
           <!-- Drag & Drop Zone -->
           <div class="file-dropzone" id="file-dropzone">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-            <h4>Glissez-déposez vos fichiers ici</h4>
-            <p>Ils seront immédiatement importés et consultables dans ce dossier</p>
+            <h4>Déposez vos fichiers ici</h4>
+            <p>Glissez-déposez vos documents pour les ajouter au dossier actuel</p>
           </div>
         </div>
       </div>
     </section>
 
     <!-- ==========================================
-         VIEW 2: CALENDRIER (IMPORT / EXPORT / VISION)
+         VIEW 2: CALENDRIER (AGENDA COMMUNICANT)
          ========================================== -->
     <section id="view-calendar" class="view-section">
       <div class="view-header">
         <div class="view-title-group">
           <h2>Agenda Maison Du Charlo</h2>
-          <p class="view-subtitle">Visionnez, importez et exportez vos événements en synchronisation Google Calendar</p>
+          <p class="view-subtitle">Planification collaborative · Importation et exportation d'événements</p>
         </div>
         <div class="action-bar">
           <input type="file" id="cal-import-picker" accept=".ics" style="display:none;">
-          <button class="apple-btn" id="btn-import-ics" title="Importer un fichier de calendrier iCalendar (.ics)">
+          <button class="apple-btn" id="btn-import-ics" title="Importer un fichier de calendrier (.ics)">
             <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
             <span>Importer .ics</span>
           </button>
-          <button class="apple-btn" id="btn-export-ics" title="Exporter vers iPhone, Mac ou Google Calendar">
+          <button class="apple-btn" id="btn-export-ics" title="Exporter l'agenda vers iPhone, Mac ou Android">
             <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
             <span>Exporter .ics</span>
           </button>
@@ -228,7 +252,7 @@
         <!-- Interactive Month Grid -->
         <div class="calendar-main-card">
           <div class="calendar-nav-bar">
-            <div class="cal-month-title" id="cal-month-display">Novembre 2026</div>
+            <div class="cal-month-title" id="cal-month-display">Mois en cours</div>
             <div class="cal-nav-buttons">
               <button class="apple-btn" onclick="App.jumpToday()">Aujourd'hui</button>
               <button class="icon-btn" onclick="App.changeMonth(-1)" title="Mois précédent">
@@ -271,17 +295,17 @@
     </section>
 
     <!-- ==========================================
-         VIEW 3: NOTES & TÂCHES (IMPORT / EXPORT / VISION)
+         VIEW 3: NOTES & TÂCHES
          ========================================== -->
     <section id="view-tasks" class="view-section">
       <div class="view-header">
         <div class="view-title-group">
           <h2>Notes & Tâches Équipe</h2>
-          <p class="view-subtitle">Rédigez, importez et exportez vos comptes-rendus et tâches collaboratives</p>
+          <p class="view-subtitle">Suivi d'activité · Comptes-rendus partagés et liste de tâches</p>
         </div>
         <div class="action-bar">
           <input type="file" id="notes-import-picker" accept=".txt,.md,.json" style="display:none;">
-          <button class="apple-btn" id="btn-import-notes" title="Importer des fichiers texte ou markdown">
+          <button class="apple-btn" id="btn-import-notes" title="Importer des documents texte ou markdown">
             <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
             <span>Importer notes</span>
           </button>
@@ -307,7 +331,7 @@
           </div>
 
           <div class="task-input-bar">
-            <input type="text" id="quick-task-input" placeholder="Ajouter un rappel ou une tâche MDC..." aria-label="Nouvelle tâche">
+            <input type="text" id="quick-task-input" placeholder="Ajouter une tâche pour l'équipe..." aria-label="Nouvelle tâche">
             <button class="apple-btn btn-gold" id="btn-add-quick-task">Ajouter</button>
           </div>
 
@@ -321,7 +345,7 @@
           <div class="column-header">
             <h3>
               <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-              Notes & Synthèses
+              Notes & Comptes-rendus
             </h3>
           </div>
 
@@ -333,22 +357,76 @@
     </section>
 
     <!-- ==========================================
-         VIEW 4: MEMBRES & ÉQUIPE
+         VIEW 4: GESTION DES COMPTES
          ========================================== -->
     <section id="view-team" class="view-section">
       <div class="view-header">
         <div class="view-title-group">
-          <h2>Membres de la Maison Du Charlo</h2>
-          <p class="view-subtitle">Annuaire et statut des membres connectés au portail</p>
+          <h2>Comptes & Accès MDC</h2>
+          <p class="view-subtitle">Gestion des membres · Identifiant : première lettre du prénom + nom + jour de naissance</p>
+        </div>
+        <div class="action-bar">
+          <button class="apple-btn btn-primary" onclick="App.openModal('modal-create-account')">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            <span>Créer un compte</span>
+          </button>
         </div>
       </div>
 
-      <div class="team-grid" id="team-grid-container">
-        <!-- Injected by JS -->
+      <div class="accounts-table-card">
+        <div id="accounts-list-container">
+          <!-- Injected by JS -->
+        </div>
       </div>
     </section>
 
   </main>
+
+  <!-- ==========================================
+       MODAL: CRÉER UN COMPTE MEMBRE
+       ========================================== -->
+  <div class="modal-overlay" id="modal-create-account">
+    <div class="apple-modal">
+      <div class="modal-header">
+        <h3>Nouveau compte membre</h3>
+        <button class="modal-close-btn">&times;</button>
+      </div>
+      <form id="form-create-account">
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="acc-fname-input">Prénom</label>
+            <input type="text" id="acc-fname-input" required placeholder="ex : Victor">
+          </div>
+          <div class="form-group">
+            <label for="acc-lname-input">Nom de famille</label>
+            <input type="text" id="acc-lname-input" required placeholder="ex : Doussot">
+          </div>
+          <div class="form-group">
+            <label for="acc-bday-input">Jour de naissance (numéro du jour)</label>
+            <input type="number" id="acc-bday-input" min="1" max="31" required placeholder="ex : 19">
+          </div>
+          <div class="form-group">
+            <label for="acc-role-input">Rôle dans la Maison Du Charlo</label>
+            <select id="acc-role-input">
+              <option value="Membre">Membre</option>
+              <option value="Administrateur">Administrateur</option>
+              <option value="Trésorier">Trésorier</option>
+              <option value="Secrétaire">Secrétaire</option>
+            </select>
+          </div>
+
+          <div style="background:var(--color-surface-secondary); padding:12px; border-radius:var(--radius-md); font-size:13px; color:var(--color-text-secondary);">
+            Identifiant généré pour la connexion : 
+            <strong id="acc-preview-username" style="color:var(--color-apple-blue); font-family:var(--font-mono); margin-left:4px;">vdoussot19</strong>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="apple-btn modal-cancel-btn">Annuler</button>
+          <button type="submit" class="apple-btn btn-primary">Enregistrer le compte</button>
+        </div>
+      </form>
+    </div>
+  </div>
 
   <!-- ==========================================
        MODAL: CRÉER UN DOSSIER
@@ -363,7 +441,7 @@
         <div class="modal-body">
           <div class="form-group">
             <label for="folder-name-input">Nom du dossier</label>
-            <input type="text" id="folder-name-input" required placeholder="ex: Projets 2026, Factures, Vidéos...">
+            <input type="text" id="folder-name-input" required placeholder="ex : Projets 2026, Factures, Sorties...">
           </div>
         </div>
         <div class="modal-footer">
@@ -375,117 +453,34 @@
   </div>
 
   <!-- ==========================================
-       MODAL: COMPTE & AUTHENTIFICATION
-       ========================================== -->
-  <div class="modal-overlay" id="modal-account">
-    <div class="apple-modal">
-      <div class="modal-header">
-        <h3>Connexion & Profil MDC</h3>
-        <button class="modal-close-btn">&times;</button>
-      </div>
-      <div class="modal-body">
-        <p style="font-size:13.5px; color:var(--color-text-secondary); line-height:1.5;">
-          Connectez votre compte Google pour synchroniser votre Google Drive 4 To, Google Calendar et Google Tasks directement dans l'interface MDC-Conect.
-        </p>
-
-        <!-- Official Google OAuth Button -->
-        <button class="apple-btn btn-primary" id="btn-google-login" style="width:100%; padding:12px; font-weight:600; display:flex; gap:10px; justify-content:center;">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M12.24 10.285V14.4h6.806c-.275 1.765-2.056 5.174-6.806 5.174-4.095 0-7.439-3.389-7.439-7.574s3.344-7.574 7.439-7.574c2.33 0 3.891.989 4.785 1.849l3.254-3.138C18.189 1.186 15.479 0 12.24 0c-6.635 0-12 5.365-12 12s5.365 12 12 12c6.926 0 11.52-4.869 11.52-11.726 0-.788-.085-1.39-.189-1.989H12.24z"/>
-          </svg>
-          Se connecter avec un compte Google (4 To)
-        </button>
-
-        <div style="text-align:center; position:relative; margin:10px 0;">
-          <span style="background:var(--color-card); padding:0 12px; font-size:12px; color:var(--color-text-tertiary); position:relative; z-index:1;">OU PROFIL LOCAL MDC</span>
-          <div style="position:absolute; top:50%; left:0; right:0; height:1px; background:var(--border-subtle);"></div>
-        </div>
-
-        <!-- Quick Local Account Switcher -->
-        <div style="display:flex; flex-direction:column; gap:8px;">
-          <button class="sidebar-item account-choice-btn" data-name="Victor Doussot" data-role="Président & Administrateur" data-avatar="VD">
-            <div class="sidebar-item-left">
-              <div class="user-avatar" style="width:28px; height:28px;">VD</div>
-              <div>
-                <strong style="font-size:13.5px;">Victor Doussot</strong>
-                <div style="font-size:11px; color:var(--color-text-tertiary);">Président MDC</div>
-              </div>
-            </div>
-            <span class="brand-badge">Admin</span>
-          </button>
-
-          <button class="sidebar-item account-choice-btn" data-name="Alexandre M." data-role="Trésorier" data-avatar="AM">
-            <div class="sidebar-item-left">
-              <div class="user-avatar" style="width:28px; height:28px; background:var(--color-apple-blue);">AM</div>
-              <div>
-                <strong style="font-size:13.5px;">Alexandre M.</strong>
-                <div style="font-size:11px; color:var(--color-text-tertiary);">Trésorier MDC</div>
-              </div>
-            </div>
-          </button>
-
-          <button class="sidebar-item account-choice-btn" data-name="Sarah B." data-role="Coordination & Événements" data-avatar="SB">
-            <div class="sidebar-item-left">
-              <div class="user-avatar" style="width:28px; height:28px; background:var(--color-apple-green);">SB</div>
-              <div>
-                <strong style="font-size:13.5px;">Sarah B.</strong>
-                <div style="font-size:11px; color:var(--color-text-tertiary);">Coordination MDC</div>
-              </div>
-            </div>
-          </button>
-
-          <button class="sidebar-item account-choice-btn" data-name="Invité MDC" data-role="Visiteur en lecture" data-avatar="IM">
-            <div class="sidebar-item-left">
-              <div class="user-avatar" style="width:28px; height:28px; background:var(--color-text-tertiary);">IM</div>
-              <div>
-                <strong style="font-size:13.5px;">Invité Maison Du Charlo</strong>
-                <div style="font-size:11px; color:var(--color-text-tertiary);">Accès consultation</div>
-              </div>
-            </div>
-          </button>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button class="apple-btn" id="btn-google-logout">Déconnexion</button>
-        <button class="apple-btn modal-cancel-btn">Fermer</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ==========================================
        MODAL: PARAMÈTRES CLOUD 4 TO
        ========================================== -->
   <div class="modal-overlay" id="modal-settings">
     <div class="apple-modal">
       <div class="modal-header">
-        <h3>Configuration Cloud 4 To & Google Suite</h3>
+        <h3>Paramètres Cloud 4 To & Passerelle</h3>
         <button class="modal-close-btn">&times;</button>
       </div>
       <form id="form-settings">
         <div class="modal-body">
           <p style="font-size:12.5px; color:var(--color-text-secondary); line-height:1.5;">
-            Reliez facilement votre site GitHub Pages à vos 4 To de stockage Google Drive, à l'agenda et aux tâches.
+            Configuration de la passerelle Google Apps Script pour synchroniser le site avec votre dossier Google Drive 4 To.
           </p>
 
           <div class="form-group">
-            <label for="cfg-gas-url">Passerelle Google Apps Script 4 To (Recommandé & 100% gratuit)</label>
+            <label for="cfg-gas-url">Passerelle Google Apps Script 4 To</label>
             <input type="text" id="cfg-gas-url" placeholder="https://script.google.com/macros/s/.../exec">
-            <span style="font-size:11px; color:var(--color-text-tertiary);">Permet à tout le monde d'importer/télécharger directement sur vos 4 To sans clé API !</span>
+            <span style="font-size:11.5px; color:var(--color-text-tertiary);">URL de votre application web Google Apps Script déployée.</span>
           </div>
 
           <div class="form-group">
-            <label for="cfg-client-id">Google Client ID (OAuth 2.0)</label>
-            <input type="text" id="cfg-client-id" placeholder="ex: 123456789-abc.apps.googleusercontent.com">
-          </div>
-
-          <div class="form-group">
-            <label for="cfg-drive-id">Identifiant Dossier Drive 4 To (Optionnel)</label>
+            <label for="cfg-drive-id">Identifiant Dossier Drive (Optionnel)</label>
             <input type="text" id="cfg-drive-id" placeholder="ID du dossier Google Drive">
           </div>
 
           <div class="form-group">
-            <label for="cfg-cal-id">ID du Calendrier Partagé (Optionnel)</label>
-            <input type="text" id="cfg-cal-id" placeholder="ex: primary ou mail@asso.fr">
+            <label for="cfg-cal-id">ID Calendrier Google (Optionnel)</label>
+            <input type="text" id="cfg-cal-id" placeholder="ex : primary ou adresse@gmail.com">
           </div>
         </div>
         <div class="modal-footer">
@@ -518,7 +513,7 @@
         <button class="apple-btn modal-cancel-btn">Fermer</button>
         <button class="apple-btn btn-primary" id="btn-download-file">
           <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          <span>Exporter / Télécharger ce fichier</span>
+          <span>Télécharger ce fichier</span>
         </button>
       </div>
     </div>
@@ -530,41 +525,41 @@
   <div class="modal-overlay" id="modal-add-event">
     <div class="apple-modal">
       <div class="modal-header">
-        <h3>Programmer un Événement MDC</h3>
+        <h3>Programmer un Événement</h3>
         <button class="modal-close-btn">&times;</button>
       </div>
       <form id="form-add-event">
         <div class="modal-body">
           <div class="form-group">
             <label for="event-title-input">Titre de l'événement</label>
-            <input type="text" id="event-title-input" required placeholder="ex: Soirée MDC / Sortie / Réunion">
+            <input type="text" id="event-title-input" required placeholder="ex : Réunion MDC / Soirée / Sortie">
           </div>
           <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
             <div class="form-group">
               <label for="event-date-input">Date</label>
-              <input type="date" id="event-date-input" required value="2026-11-20">
+              <input type="date" id="event-date-input" required>
             </div>
             <div class="form-group">
               <label for="event-time-input">Horaires</label>
-              <input type="text" id="event-time-input" placeholder="ex: 19:30 - 23:00">
+              <input type="text" id="event-time-input" placeholder="ex : 19:30 - 23:00">
             </div>
           </div>
           <div class="form-group">
             <label for="event-loc-input">Lieu</label>
-            <input type="text" id="event-loc-input" placeholder="ex: Local MDC / En ligne">
+            <input type="text" id="event-loc-input" placeholder="ex : Local MDC / En ligne">
           </div>
           <div class="form-group">
             <label for="event-cat-input">Catégorie</label>
             <select id="event-cat-input">
-              <option value="party">Fête / Soirée MDC (Doré)</option>
-              <option value="meeting">Réunion & Organisation (Bleu)</option>
-              <option value="trip">Sortie & Activité (Vert)</option>
-              <option value="important">Important / Assemblée (Rouge)</option>
+              <option value="party">Fête / Soirée</option>
+              <option value="meeting">Réunion & Organisation</option>
+              <option value="trip">Sortie & Activité</option>
+              <option value="important">Important / Assemblée</option>
             </select>
           </div>
           <div class="form-group">
             <label for="event-desc-input">Description & Notes</label>
-            <textarea id="event-desc-input" rows="3" placeholder="Détails du programme, ce qu'il faut apporter..."></textarea>
+            <textarea id="event-desc-input" rows="3" placeholder="Informations complémentaires..."></textarea>
           </div>
         </div>
         <div class="modal-footer">
@@ -588,11 +583,11 @@
         <div class="modal-body">
           <div class="form-group">
             <label for="note-title-input">Titre</label>
-            <input type="text" id="note-title-input" required placeholder="ex: Compte-rendu réunion">
+            <input type="text" id="note-title-input" required placeholder="ex : Compte-rendu réunion">
           </div>
           <div class="form-group">
             <label for="note-tag-input">Thème / Tag</label>
-            <input type="text" id="note-tag-input" placeholder="ex: Organisation, Événements, Idées">
+            <input type="text" id="note-tag-input" placeholder="ex : Organisation, Événements, Idées">
           </div>
           <div class="form-group">
             <label for="note-content-input">Contenu</label>

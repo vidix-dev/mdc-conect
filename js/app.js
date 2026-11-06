@@ -1,182 +1,54 @@
 /**
  * MDC-Conect · Core Application Logic
- * Integrates Google Drive, Google Calendar, and Google Tasks with Apple Design UX
- * Features:
- * - Real Folders tree navigation (Create, Navigate, Delete)
- * - In-App Multimedia Viewer (Images, Video, Audio, PDF, Text, Spreadsheets)
- * - Export single file, or Export entire folder as ZIP (JSZip)
- * - Calendar Import (.ics) & Export (.ics)
- * - Notes Import (.md/.txt/.json) & Export (ZIP/JSON)
- * - Direct Google Apps Script Web App Relay for 4TB Drive & Google GIS OAuth2
+ * Virgin State · No Fake Data · Pure SVG Icons
+ * Account Auth: First letter of first name + Last name + Day of birth (e.g. vdoussot19)
+ * Integrated with 4TB Google Apps Script Web App Gateway
  */
 
-// Initial Seed Data for MDC (Maison Du Charlo)
-const DEFAULT_MDC_DATA = {
-  user: {
-    name: "Victor Doussot",
-    email: "victor@maisonducharlo.fr",
-    role: "Président & Administrateur",
-    avatar: "VD",
-    isGoogle: false
-  },
+// Format generator: première lettre du prénom + nom de famille + jour de naissance
+function generateUsername(firstName, lastName, birthDay) {
+  if (!firstName || !lastName || !birthDay) return "";
+  const f = firstName.trim().charAt(0).toLowerCase();
+  const l = lastName.trim().toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]/g, "");
+  const d = String(parseInt(birthDay, 10) || birthDay).trim();
+  return `${f}${l}${d}`;
+}
+
+// Initial Virgin State (Clean slate)
+const DEFAULT_VIRGIN_DATA = {
+  currentUser: null,
   currentFolderId: "root",
-  folders: [
-    { id: "fld_docs", name: "Documents Officiels", parentId: "root" },
-    { id: "fld_events", name: "Événements & Soirées", parentId: "root" },
-    { id: "fld_photos", name: "Photos & Médias", parentId: "root" },
-    { id: "fld_compta", name: "Trésorerie & Factures", parentId: "root" }
-  ],
-  members: [
-    { id: 1, name: "Victor Doussot", role: "Président & Fondateur", email: "victor@mdc.fr", status: "En ligne", avatar: "VD" },
-    { id: 2, name: "Alexandre M.", role: "Trésorier", email: "alex@mdc.fr", status: "Actif", avatar: "AM" },
-    { id: 3, name: "Sarah B.", role: "Coordination & Événements", email: "sarah@mdc.fr", status: "En ligne", avatar: "SB" },
-    { id: 4, name: "Lucas P.", role: "Pôle Communication", email: "lucas@mdc.fr", status: "Absent", avatar: "LP" },
-    { id: 5, name: "Camille D.", role: "Logistique & Matériel", email: "camille@mdc.fr", status: "Actif", avatar: "CD" }
-  ],
-  files: [
+  accounts: [
     {
-      id: "f1",
-      folderId: "fld_docs",
-      name: "Charte_Fondatrice_MDC.pdf",
-      type: "pdf",
-      size: "1.4 Mo",
-      date: "02 Nov 2026",
-      category: "documents",
-      author: "Victor D.",
-      url: "assets/logo.jpg",
-      content: "Charte officielle de la Maison Du Charlo (MDC).\n\n1. Convivialité et respect des membres.\n2. Organisation démocratique des événements et projets communs.\n3. Partage des ressources et entraide permanente.\n\nSigné par le bureau MDC."
-    },
-    {
-      id: "f2",
-      folderId: "fld_compta",
-      name: "Planning_Activites_MDC_2026.xlsx",
-      type: "spreadsheet",
-      size: "420 Ko",
-      date: "04 Nov 2026",
-      category: "spreadsheets",
-      author: "Sarah B.",
-      content: "Mois\tÉvénement\tBudget\tStatut\nNovembre\tSoirée Intégration MDC\t350€\tValidé\nDécembre\tGrand Repas de Fin d'Année\t600€\tEn cours\nJanvier\tTournoi Gaming MDC\t150€\tPlanifié"
-    },
-    {
-      id: "f3",
-      folderId: "fld_photos",
-      name: "Logo_Officiel_MDC_HD.jpg",
-      type: "image",
-      size: "2.1 Mo",
-      date: "01 Nov 2026",
-      category: "images",
-      author: "Victor D.",
-      url: "assets/logo.jpg",
-      content: "Logo officiel Maison Du Charlo avec couronne dorée."
-    },
-    {
-      id: "f4",
-      folderId: "fld_docs",
-      name: "Compte_Rendu_Reunion_Budget.txt",
-      type: "text",
-      size: "34 Ko",
-      date: "05 Nov 2026",
-      category: "documents",
-      author: "Alexandre M.",
-      content: "RÉUNION DU BUREAU DU 05/11/2026\n\nPoints abordés :\n- Bilan positif des cotisations\n- Achat du matériel commun pour les sorties\n- Validation de la mise en place du cloud unifié MDC-Conect sur GitHub Pages avec 4 To partagés."
-    },
-    {
-      id: "f5",
-      folderId: "root",
-      name: "Statuts_Association_Charlo.pdf",
-      type: "pdf",
-      size: "890 Ko",
-      date: "28 Oct 2026",
-      category: "documents",
-      author: "Victor D.",
-      content: "Statuts légaux et règlement intérieur de l'entité MDC."
+      id: "acc_admin",
+      username: "vdoussot19",
+      firstName: "Victor",
+      lastName: "Doussot",
+      birthDay: 19,
+      role: "Administrateur",
+      createdAt: "06 Nov 2026"
     }
   ],
-  events: [
-    {
-      id: "e1",
-      title: "Grande Soirée d'Hiver MDC",
-      date: "2026-11-20",
-      time: "20:00 - 02:00",
-      category: "party",
-      location: "Local MDC Principal",
-      description: "Soirée festive de retrouvailles pour tous les membres avec buffet partagé."
-    },
-    {
-      id: "e2",
-      title: "Assemblée Générale MDC",
-      date: "2026-11-15",
-      time: "18:30 - 20:00",
-      category: "important",
-      location: "Salle de conférence & Visio",
-      description: "Ordre du jour : Bilan semestriel, projets futurs et vote du bureau."
-    },
-    {
-      id: "e3",
-      title: "Sortie Découverte & Repas Équipe",
-      date: "2026-11-28",
-      time: "12:00 - 17:00",
-      category: "trip",
-      location: "Parc Naturel & Restaurant",
-      description: "Randonnée conviviale et grand déjeuner."
-    },
-    {
-      id: "e4",
-      title: "Point Hebdomadaire Projets",
-      date: "2026-11-10",
-      time: "19:00 - 19:45",
-      category: "meeting",
-      location: "En ligne (Google Meet)",
-      description: "Suivi des tâches en cours et programmation des semaines à venir."
-    }
-  ],
-  tasks: [
-    { id: "t1", title: "Finaliser les réservations pour la Soirée MDC", completed: false, due: "14 Nov 2026", priority: "high", author: "Sarah B." },
-    { id: "t2", title: "Publier le bilan financier du mois d'octobre", completed: true, due: "05 Nov 2026", priority: "normal", author: "Alexandre M." },
-    { id: "t3", title: "Déployer MDC-Conect sur GitHub Pages avec 4 To", completed: false, due: "10 Nov 2026", priority: "high", author: "Victor D." },
-    { id: "t4", title: "Commander les sweats brodés avec le logo MDC", completed: false, due: "22 Nov 2026", priority: "normal", author: "Lucas P." },
-    { id: "t5", title: "Mettre à jour l'inventaire du local", completed: true, due: "01 Nov 2026", priority: "low", author: "Camille D." }
-  ],
-  notes: [
-    {
-      id: "n1",
-      title: "Idées d'activités pour le printemps",
-      author: "Sarah B.",
-      date: "05 Nov 2026",
-      tag: "Événements",
-      content: "1. Tournoi de pétanque / mölkky au soleil\n2. Projection cinéma en plein air avec projecteur\n3. Barbecue géant MDC avec les anciens membres."
-    },
-    {
-      id: "n2",
-      title: "Guide de bienvenue nouveaux arrivants",
-      author: "Victor D.",
-      date: "03 Nov 2026",
-      tag: "Organisation",
-      content: "Bienvenue à la Maison Du Charlo ! Dès votre adhésion, rejoignez le portail MDC-Conect pour retrouver tous les fichiers partagés (4 To), l'agenda et les tâches de l'équipe."
-    },
-    {
-      id: "n3",
-      title: "Checklist technique sono et lumières",
-      author: "Lucas P.",
-      date: "31 Oct 2026",
-      tag: "Matériel",
-      content: "- Câbles XLR (vérifier les 4 longs)\n- Table de mixage testée\n- Enceintes amplifiées rangées dans leurs housses\n- Multiprises protégées."
-    }
-  ],
+  folders: [],
+  files: [],
+  events: [],
+  tasks: [],
+  notes: [],
   settings: {
+    gasWebappUrl: "https://script.google.com/macros/s/AKfycbx6AyPMD99J68qmikpr-ay22dWMkzY-mkCaufAAhCiLtnS_0fGRRoMsrrEHLyXjbEKDLw/exec",
     googleClientId: "",
-    googleApiKey: "",
     driveFolderId: "",
-    gasWebappUrl: "", // Google Apps Script URL for 4TB Google Drive
     calendarId: "",
     storageTotal: "4 To"
   }
 };
 
-// State Store with Local Persistence
+// Data Store with Local Storage persistence
 class MDCStore {
   constructor() {
-    this.key = "mdc_conect_data_v2";
+    this.key = "mdc_conect_virgin_v3";
     this.data = this.load();
   }
 
@@ -185,14 +57,18 @@ class MDCStore {
       const stored = localStorage.getItem(this.key);
       if (stored) {
         const parsed = JSON.parse(stored);
-        if (!parsed.folders) parsed.folders = DEFAULT_MDC_DATA.folders;
-        if (!parsed.currentFolderId) parsed.currentFolderId = "root";
+        if (!parsed.accounts || parsed.accounts.length === 0) {
+          parsed.accounts = DEFAULT_VIRGIN_DATA.accounts;
+        }
+        if (!parsed.settings.gasWebappUrl) {
+          parsed.settings.gasWebappUrl = DEFAULT_VIRGIN_DATA.settings.gasWebappUrl;
+        }
         return parsed;
       }
     } catch (e) {
       console.warn("Storage load error", e);
     }
-    return JSON.parse(JSON.stringify(DEFAULT_MDC_DATA));
+    return JSON.parse(JSON.stringify(DEFAULT_VIRGIN_DATA));
   }
 
   save() {
@@ -205,240 +81,25 @@ class MDCStore {
 
   reset() {
     localStorage.removeItem(this.key);
-    this.data = JSON.parse(JSON.stringify(DEFAULT_MDC_DATA));
+    this.data = JSON.parse(JSON.stringify(DEFAULT_VIRGIN_DATA));
     this.save();
   }
 }
 
 const store = new MDCStore();
 
-// Google API Client Manager
-class GoogleAPIManager {
-  constructor() {
-    this.tokenClient = null;
-    this.accessToken = null;
-    this.isAuthorized = false;
-    this.scopes = [
-      "https://www.googleapis.com/auth/userinfo.profile",
-      "https://www.googleapis.com/auth/userinfo.email",
-      "https://www.googleapis.com/auth/drive.readonly",
-      "https://www.googleapis.com/auth/calendar.events",
-      "https://www.googleapis.com/auth/tasks"
-    ].join(" ");
-  }
-
-  init() {
-    const clientId = store.data.settings.googleClientId;
-    if (!clientId) {
-      return;
-    }
-
-    if (window.google && window.google.accounts && window.google.accounts.oauth2) {
-      try {
-        this.tokenClient = google.accounts.oauth2.initTokenClient({
-          client_id: clientId,
-          scope: this.scopes,
-          callback: async (resp) => {
-            if (resp.error) {
-              App.showToast("Erreur Google OAuth : " + resp.error);
-              return;
-            }
-            this.accessToken = resp.access_token;
-            this.isAuthorized = true;
-            await this.fetchUserProfile();
-            await this.syncDriveFiles();
-            await this.syncCalendarEvents();
-            await this.syncGoogleTasks();
-            App.renderAll();
-            App.showToast("Connecté à Google Suite (4 To) !");
-          }
-        });
-      } catch (err) {
-        console.error("GIS init error:", err);
-      }
-    }
-  }
-
-  signIn() {
-    if (!store.data.settings.googleClientId) {
-      App.openModal("modal-settings");
-      App.showToast("Renseignez d'abord votre Google Client ID");
-      return;
-    }
-    if (this.tokenClient) {
-      this.tokenClient.requestAccessToken({ prompt: "consent" });
-    } else {
-      this.init();
-      if (this.tokenClient) {
-        this.tokenClient.requestAccessToken({ prompt: "consent" });
-      } else {
-        App.showToast("Chargement de Google Identity Services...");
-      }
-    }
-  }
-
-  signOut() {
-    if (this.accessToken && window.google && window.google.accounts) {
-      google.accounts.oauth2.revoke(this.accessToken, () => console.log("Token revoked"));
-    }
-    this.accessToken = null;
-    this.isAuthorized = false;
-    store.data.user = {
-      name: "Victor Doussot",
-      email: "victor@maisonducharlo.fr",
-      role: "Président & Administrateur",
-      avatar: "VD",
-      isGoogle: false
-    };
-    store.save();
-    App.renderAll();
-    App.showToast("Déconnexion réussie");
-  }
-
-  async fetchUserProfile() {
-    if (!this.accessToken) return;
-    try {
-      const res = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
-        headers: { Authorization: `Bearer ${this.accessToken}` }
-      });
-      const profile = await res.json();
-      store.data.user = {
-        name: profile.name || "Membre Google",
-        email: profile.email || "google@mdc.fr",
-        role: "Connecté Google 4 To",
-        avatar: profile.picture || "G",
-        isGoogle: true
-      };
-      store.save();
-    } catch (e) {
-      console.warn("User profile fetch error", e);
-    }
-  }
-
-  async syncDriveFiles() {
-    if (!this.accessToken) return;
-    try {
-      let url = "https://www.googleapis.com/drive/v3/files?pageSize=40&fields=files(id,name,mimeType,size,modifiedTime,webViewLink,thumbnailLink)";
-      if (store.data.settings.driveFolderId) {
-        url += `&q='${store.data.settings.driveFolderId}'+in+parents+and+trashed=false`;
-      }
-      const res = await fetch(url, {
-        headers: { Authorization: `Bearer ${this.accessToken}` }
-      });
-      const data = await res.json();
-      if (data.files && data.files.length > 0) {
-        const mapped = data.files.map(f => ({
-          id: f.id,
-          folderId: store.data.currentFolderId || "root",
-          name: f.name,
-          type: this.categorizeMime(f.mimeType),
-          size: f.size ? (parseInt(f.size) / (1024 * 1024)).toFixed(1) + " Mo" : "Google Doc",
-          date: new Date(f.modifiedTime).toLocaleDateString("fr-FR"),
-          category: this.getCategory(f.mimeType),
-          author: "Google Drive 4 To",
-          url: f.webViewLink,
-          thumbnail: f.thumbnailLink,
-          content: "Fichier hébergé sur Google Drive 4 To de la Maison Du Charlo."
-        }));
-        store.data.files = [...mapped, ...DEFAULT_MDC_DATA.files];
-        store.save();
-      }
-    } catch (e) {
-      console.warn("Drive sync error", e);
-    }
-  }
-
-  async syncCalendarEvents() {
-    if (!this.accessToken) return;
-    try {
-      const calId = store.data.settings.calendarId || "primary";
-      const now = new Date().toISOString();
-      const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calId)}/events?timeMin=${now}&maxResults=25&singleEvents=true&orderBy=startTime`;
-      const res = await fetch(url, {
-        headers: { Authorization: `Bearer ${this.accessToken}` }
-      });
-      const data = await res.json();
-      if (data.items && data.items.length > 0) {
-        const mapped = data.items.map(ev => ({
-          id: ev.id,
-          title: ev.summary || "Sans titre",
-          date: (ev.start.date || ev.start.dateTime || "").substring(0, 10),
-          time: ev.start.dateTime ? new Date(ev.start.dateTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "Toute la journée",
-          category: "meeting",
-          location: ev.location || "MDC",
-          description: ev.description || ""
-        }));
-        store.data.events = [...mapped, ...DEFAULT_MDC_DATA.events];
-        store.save();
-      }
-    } catch (e) {
-      console.warn("Calendar sync error", e);
-    }
-  }
-
-  async syncGoogleTasks() {
-    if (!this.accessToken) return;
-    try {
-      const res = await fetch("https://tasks.googleapis.com/tasks/v1/users/@me/lists", {
-        headers: { Authorization: `Bearer ${this.accessToken}` }
-      });
-      const lists = await res.json();
-      if (lists.items && lists.items[0]) {
-        const listId = lists.items[0].id;
-        const taskRes = await fetch(`https://tasks.googleapis.com/tasks/v1/lists/${listId}/tasks`, {
-          headers: { Authorization: `Bearer ${this.accessToken}` }
-        });
-        const taskData = await taskRes.json();
-        if (taskData.items) {
-          const mapped = taskData.items.map(t => ({
-            id: t.id,
-            title: t.title,
-            completed: t.status === "completed",
-            due: t.due ? new Date(t.due).toLocaleDateString("fr-FR") : "Flexible",
-            priority: "normal",
-            author: store.data.user.name
-          }));
-          store.data.tasks = [...mapped, ...DEFAULT_MDC_DATA.tasks];
-          store.save();
-        }
-      }
-    } catch (e) {
-      console.warn("Tasks sync error", e);
-    }
-  }
-
-  categorizeMime(mime) {
-    if (!mime) return "document";
-    if (mime.includes("pdf")) return "pdf";
-    if (mime.includes("image")) return "image";
-    if (mime.includes("video")) return "video";
-    if (mime.includes("audio")) return "audio";
-    if (mime.includes("sheet") || mime.includes("excel")) return "spreadsheet";
-    return "document";
-  }
-
-  getCategory(mime) {
-    if (!mime) return "documents";
-    if (mime.includes("image") || mime.includes("video") || mime.includes("audio")) return "images";
-    if (mime.includes("sheet") || mime.includes("excel")) return "spreadsheets";
-    return "documents";
-  }
-}
-
-const googleApi = new GoogleAPIManager();
-
 // Core Application UI Controller
 const App = {
   currentTab: "drive",
-  currentCalendarDate: new Date(2026, 10, 1),
+  currentCalendarDate: new Date(),
   activeFilterCategory: "all",
   searchQuery: "",
 
   init() {
     this.bindEvents();
     this.applyTheme();
-    this.renderAll();
-    googleApi.init();
+    this.checkAuthStatus();
+    this.syncFromGAS();
   },
 
   bindEvents() {
@@ -476,6 +137,43 @@ const App = {
       });
     });
 
+    // Login Form Submit
+    document.getElementById("form-lock-login")?.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const input = document.getElementById("lock-username-input").value.trim().toLowerCase();
+      this.loginWithUsername(input);
+    });
+
+    // Create Account Form Submit
+    document.getElementById("form-create-account")?.addEventListener("submit", (e) => {
+      e.preventDefault();
+      this.handleCreateAccount();
+    });
+
+    // Realtime Account preview when typing
+    const fnameInput = document.getElementById("acc-fname-input");
+    const lnameInput = document.getElementById("acc-lname-input");
+    const bdayInput = document.getElementById("acc-bday-input");
+    const previewBox = document.getElementById("acc-preview-username");
+
+    const updatePreview = () => {
+      if (!previewBox) return;
+      const fn = fnameInput?.value || "";
+      const ln = lnameInput?.value || "";
+      const bd = bdayInput?.value || "";
+      const code = generateUsername(fn, ln, bd);
+      previewBox.textContent = code ? code : "vdoussot19";
+    };
+
+    fnameInput?.addEventListener("input", updatePreview);
+    lnameInput?.addEventListener("input", updatePreview);
+    bdayInput?.addEventListener("input", updatePreview);
+
+    // Logout Button
+    document.getElementById("btn-user-logout")?.addEventListener("click", () => {
+      this.logout();
+    });
+
     // File Dropzone & Multiple File Picker
     const dropzone = document.getElementById("file-dropzone");
     const filePicker = document.getElementById("file-picker-hidden");
@@ -500,7 +198,7 @@ const App = {
       });
     }
 
-    // New Folder Modal Form
+    // New Folder Form
     document.getElementById("form-create-folder")?.addEventListener("submit", (e) => {
       e.preventDefault();
       const folderName = document.getElementById("folder-name-input").value.trim();
@@ -527,41 +225,25 @@ const App = {
       }
     });
 
-    // Form submissions
+    // Add Event Form
     document.getElementById("form-add-event")?.addEventListener("submit", (e) => {
       e.preventDefault();
       this.saveEventFromModal();
     });
 
+    // Add Note Form
     document.getElementById("form-add-note")?.addEventListener("submit", (e) => {
       e.preventDefault();
       this.saveNoteFromModal();
     });
 
+    // Settings Form
     document.getElementById("form-settings")?.addEventListener("submit", (e) => {
       e.preventDefault();
       this.saveSettings();
     });
 
-    // Google Sign in / out
-    document.getElementById("btn-google-login")?.addEventListener("click", () => googleApi.signIn());
-    document.getElementById("btn-google-logout")?.addEventListener("click", () => googleApi.signOut());
-
-    // Switch Account Profile
-    document.querySelectorAll(".account-choice-btn")?.forEach(btn => {
-      btn.addEventListener("click", (e) => {
-        const name = e.currentTarget.getAttribute("data-name");
-        const role = e.currentTarget.getAttribute("data-role");
-        const avatar = e.currentTarget.getAttribute("data-avatar");
-        store.data.user = { name, role, avatar, email: `${name.toLowerCase().replace(/ /g, '.')}@mdc.fr`, isGoogle: false };
-        store.save();
-        this.closeModal("modal-account");
-        this.renderUserProfile();
-        this.showToast(`Connecté en tant que ${name}`);
-      });
-    });
-
-    // Calendar Export / Import buttons
+    // Calendar Export / Import
     document.getElementById("btn-export-ics")?.addEventListener("click", () => this.exportICS());
     const calImportPicker = document.getElementById("cal-import-picker");
     document.getElementById("btn-import-ics")?.addEventListener("click", () => calImportPicker?.click());
@@ -569,7 +251,7 @@ const App = {
       if (e.target.files.length > 0) this.importICS(e.target.files[0]);
     });
 
-    // Notes Export / Import buttons
+    // Notes Export / Import
     document.getElementById("btn-export-notes")?.addEventListener("click", () => this.exportNotes());
     const notesImportPicker = document.getElementById("notes-import-picker");
     document.getElementById("btn-import-notes")?.addEventListener("click", () => notesImportPicker?.click());
@@ -581,6 +263,175 @@ const App = {
     document.getElementById("btn-export-folder-zip")?.addEventListener("click", () => this.exportCurrentFolderZip());
   },
 
+  /* ==========================================
+     AUTHENTICATION & ACCOUNT MANAGEMENT
+     ========================================== */
+  checkAuthStatus() {
+    const lockScreen = document.getElementById("lock-screen-overlay");
+    if (!store.data.currentUser) {
+      if (lockScreen) lockScreen.classList.remove("hidden");
+    } else {
+      if (lockScreen) lockScreen.classList.add("hidden");
+      this.renderAll();
+    }
+  },
+
+  loginWithUsername(username) {
+    if (!username) return;
+    const account = store.data.accounts.find(a => a.username.toLowerCase() === username.toLowerCase());
+    if (account) {
+      store.data.currentUser = account;
+      store.save();
+      const lockScreen = document.getElementById("lock-screen-overlay");
+      if (lockScreen) lockScreen.classList.add("hidden");
+      this.renderAll();
+      this.showToast(`Bienvenue ${account.firstName} ${account.lastName}`);
+    } else {
+      alert(`Identifiant « ${username} » introuvable.\n\nLe format requis est : première lettre du prénom + nom de famille + jour de naissance (par exemple : vdoussot19).`);
+    }
+  },
+
+  logout() {
+    store.data.currentUser = null;
+    store.save();
+    const lockScreen = document.getElementById("lock-screen-overlay");
+    if (lockScreen) lockScreen.classList.remove("hidden");
+    const input = document.getElementById("lock-username-input");
+    if (input) {
+      input.value = "";
+      input.focus();
+    }
+  },
+
+  handleCreateAccount() {
+    const firstName = document.getElementById("acc-fname-input").value.trim();
+    const lastName = document.getElementById("acc-lname-input").value.trim();
+    const birthDay = document.getElementById("acc-bday-input").value.trim();
+    const role = document.getElementById("acc-role-input").value;
+
+    const username = generateUsername(firstName, lastName, birthDay);
+
+    if (!username) {
+      alert("Veuillez renseigner le prénom, le nom et le jour de naissance.");
+      return;
+    }
+
+    const exists = store.data.accounts.some(a => a.username === username);
+    if (exists) {
+      alert(`Un compte avec l'identifiant ${username} existe déjà.`);
+      return;
+    }
+
+    const newAccount = {
+      id: "acc_" + Date.now(),
+      username: username,
+      firstName: firstName,
+      lastName: lastName,
+      birthDay: parseInt(birthDay, 10),
+      role: role,
+      createdAt: new Date().toLocaleDateString("fr-FR")
+    };
+
+    store.data.accounts.push(newAccount);
+    store.save();
+
+    this.closeModal("modal-create-account");
+    this.renderAccountsList();
+    this.showToast(`Compte « ${username} » créé avec succès !`);
+
+    // If currently locked, auto-fill login input
+    const lockInput = document.getElementById("lock-username-input");
+    if (lockInput) {
+      lockInput.value = username;
+    }
+  },
+
+  deleteAccount(accountId) {
+    const account = store.data.accounts.find(a => a.id === accountId);
+    if (!account) return;
+
+    if (store.data.currentUser && store.data.currentUser.id === accountId) {
+      alert("Vous ne pouvez pas supprimer le compte actuellement connecté.");
+      return;
+    }
+
+    if (confirm(`Confirmez-vous la suppression du compte « ${account.firstName} ${account.lastName} » (${account.username}) ?`)) {
+      store.data.accounts = store.data.accounts.filter(a => a.id !== accountId);
+      store.save();
+      this.renderAccountsList();
+      this.showToast("Compte supprimé");
+    }
+  },
+
+  renderAccountsList() {
+    const container = document.getElementById("accounts-list-container");
+    if (!container) return;
+
+    container.innerHTML = store.data.accounts.map(acc => {
+      const initials = (acc.firstName.charAt(0) + acc.lastName.charAt(0)).toUpperCase();
+      const isCurrent = store.data.currentUser && store.data.currentUser.id === acc.id;
+
+      return `
+        <div class="account-row">
+          <div class="account-col-main">
+            <div class="account-avatar-circle">${initials}</div>
+            <div class="account-details">
+              <h4>${acc.firstName} ${acc.lastName} ${isCurrent ? '<span style="font-size:11px; color:var(--color-apple-blue); font-weight:normal;">(Vous)</span>' : ''}</h4>
+              <div class="account-meta-line">
+                <span class="account-code-pill">${acc.username}</span>
+                <span>${acc.role}</span>
+                <span>Créé le ${acc.createdAt}</span>
+              </div>
+            </div>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            ${!isCurrent ? `
+              <button class="file-mini-btn btn-delete" onclick="App.deleteAccount('${acc.id}')" title="Supprimer ce compte">
+                <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                <span>Supprimer</span>
+              </button>
+            ` : ''}
+          </div>
+        </div>
+      `;
+    }).join("");
+  },
+
+  /* ==========================================
+     GOOGLE APPS SCRIPT WEB APP INTEGRATION (4TB)
+     ========================================== */
+  async syncFromGAS() {
+    const url = store.data.settings.gasWebappUrl;
+    if (!url) return;
+
+    try {
+      const res = await fetch(url + "?action=list", { mode: "cors" });
+      const text = await res.text();
+      try {
+        const data = JSON.parse(text);
+        if (data && data.success) {
+          if (Array.isArray(data.folders) && data.folders.length > 0) {
+            store.data.folders = data.folders;
+          }
+          if (Array.isArray(data.files) && data.files.length > 0) {
+            store.data.files = data.files;
+          }
+          store.save();
+          this.renderFolders();
+          this.renderDriveFiles();
+        }
+      } catch (parseErr) {
+        // Returned HTML (e.g., auth prompt)
+        console.log("GAS Response is not JSON yet");
+      }
+    } catch (e) {
+      console.warn("GAS sync error", e);
+    }
+  },
+
+  /* ==========================================
+     THEME & NAVIGATION
+     ========================================== */
   applyTheme() {
     const saved = localStorage.getItem("mdc_theme") || "light";
     document.documentElement.setAttribute("data-theme", saved);
@@ -591,12 +442,15 @@ const App = {
     const btn = document.getElementById("btn-toggle-theme");
     if (!btn) return;
     const logoImg = document.getElementById("app-header-logo");
+    const lockLogo = document.getElementById("lock-screen-logo");
     if (theme === "dark") {
       btn.innerHTML = `<svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>`;
       if (logoImg) logoImg.src = "assets/logo-dark.png";
+      if (lockLogo) lockLogo.src = "assets/logo-dark.png";
     } else {
       btn.innerHTML = `<svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>`;
       if (logoImg) logoImg.src = "assets/logo.jpg";
+      if (lockLogo) lockLogo.src = "assets/logo.jpg";
     }
   },
 
@@ -620,39 +474,31 @@ const App = {
     this.renderDriveFiles();
     this.renderCalendar();
     this.renderTasksAndNotes();
-    this.renderMembers();
+    this.renderAccountsList();
     this.renderSettingsValues();
   },
 
   renderUserProfile() {
-    const user = store.data.user;
+    const user = store.data.currentUser;
     const nameLabel = document.getElementById("user-name-display");
     const avatarBox = document.getElementById("user-avatar-display");
-    const statusDot = document.getElementById("status-dot");
     const statusText = document.getElementById("status-text");
 
-    if (nameLabel) nameLabel.textContent = user.name;
-    if (avatarBox) {
-      if (user.avatar && user.avatar.startsWith("http")) {
-        avatarBox.innerHTML = `<img src="${user.avatar}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">`;
-      } else {
-        avatarBox.textContent = user.avatar || "VD";
+    if (user) {
+      if (nameLabel) nameLabel.textContent = `${user.firstName} ${user.lastName}`;
+      if (avatarBox) {
+        avatarBox.textContent = (user.firstName.charAt(0) + user.lastName.charAt(0)).toUpperCase();
       }
-    }
-
-    if (statusDot && statusText) {
-      if (googleApi.isAuthorized) {
-        statusDot.className = "status-dot";
-        statusText.textContent = "Google Cloud 4 To";
-      } else {
-        statusDot.className = "status-dot offline";
-        statusText.textContent = "Espace MDC 4 To";
-      }
+      if (statusText) statusText.textContent = user.username;
+    } else {
+      if (nameLabel) nameLabel.textContent = "Non connecté";
+      if (avatarBox) avatarBox.textContent = "--";
+      if (statusText) statusText.textContent = "Déconnecté";
     }
   },
 
   /* ==========================================
-     MODULE 1: FOLDERS & FILES (4 TO CLOUD)
+     MODULE 1: FOLDERS & FILES (4 TO VIRGIN)
      ========================================== */
   getCurrentFolder() {
     const id = store.data.currentFolderId || "root";
@@ -678,14 +524,14 @@ const App = {
     store.save();
     this.renderFolders();
     this.renderDriveBreadcrumbs();
-    this.showToast(`Dossier « ${name} » créé !`);
+    this.showToast(`Dossier « ${name} » créé`);
   },
 
   deleteFolder(folderId, e) {
     if (e) e.stopPropagation();
     const folder = store.data.folders.find(f => f.id === folderId);
     if (!folder) return;
-    if (confirm(`Voulez-vous supprimer le dossier « ${folder.name} » et ses fichiers ?`)) {
+    if (confirm(`Confirmez-vous la suppression du dossier « ${folder.name} » et de son contenu ?`)) {
       store.data.folders = store.data.folders.filter(f => f.id !== folderId);
       store.data.files = store.data.files.filter(f => f.folderId !== folderId);
       store.save();
@@ -701,15 +547,15 @@ const App = {
 
     const current = this.getCurrentFolder();
     let html = `<span class="breadcrumb-item" onclick="App.navigateToFolder('root')">MDC Cloud 4 To</span>`;
-    
     if (current.id !== "root") {
-      html += ` <span class="breadcrumb-sep">›</span> <span style="font-weight:600; color:var(--color-text-primary);">${this.escapeHTML(current.name)}</span>`;
+      html += ` <span class="breadcrumb-sep">/</span> <span style="font-weight:600; color:var(--color-text-primary);">${this.escapeHTML(current.name)}</span>`;
     }
     trail.innerHTML = html;
   },
 
   renderFolders() {
     const container = document.getElementById("folders-grid-container");
+    const wrapper = document.getElementById("folders-wrapper");
     if (!container) return;
 
     const currentId = store.data.currentFolderId || "root";
@@ -717,11 +563,11 @@ const App = {
 
     if (subfolders.length === 0) {
       container.innerHTML = "";
-      document.getElementById("folders-wrapper")?.classList.add("hidden");
+      if (wrapper) wrapper.style.display = "none";
       return;
     }
 
-    document.getElementById("folders-wrapper")?.classList.remove("hidden");
+    if (wrapper) wrapper.style.display = "block";
     container.innerHTML = subfolders.map(folder => {
       const fileCount = store.data.files.filter(f => f.folderId === folder.id).length;
       return `
@@ -732,10 +578,10 @@ const App = {
             </svg>
             <div class="folder-card-info">
               <span class="folder-card-name" title="${folder.name}">${folder.name}</span>
-              <span class="folder-card-count">${fileCount} fichier${fileCount > 1 ? 's' : ''}</span>
+              <span class="folder-card-count">${fileCount} élément${fileCount > 1 ? 's' : ''}</span>
             </div>
           </div>
-          <button class="folder-delete-btn" onclick="App.deleteFolder('${folder.id}', event)" title="Supprimer ce dossier">
+          <button class="folder-delete-btn" onclick="App.deleteFolder('${folder.id}', event)" title="Supprimer">
             <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
           </button>
         </div>
@@ -759,12 +605,15 @@ const App = {
 
     if (files.length === 0) {
       container.innerHTML = `
-        <div style="grid-column: 1 / -1; text-align: center; padding: 36px 20px; color: var(--color-text-tertiary);">
-          <svg width="44" height="44" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" style="margin-bottom:8px; opacity:0.6;">
-            <path d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>
+        <div class="virgin-state-box">
+          <svg class="virgin-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+            <line x1="12" y1="18" x2="12" y2="12"/>
+            <line x1="9" y1="15" x2="15" y2="15"/>
           </svg>
-          <p style="font-size:14px; font-weight:500;">Aucun fichier dans ce dossier</p>
-          <p style="font-size:12.5px; margin-top:4px;">Glissez des fichiers ci-dessous ou cliquez sur « Importer un fichier »</p>
+          <div class="virgin-state-title">Aucun document dans ce dossier</div>
+          <div class="virgin-state-desc">Déposez vos fichiers par glisser-déposer ou cliquez sur « Importer un fichier ».</div>
         </div>
       `;
       return;
@@ -812,7 +661,7 @@ const App = {
     } else if (type === "audio") {
       return `<svg class="file-card-icon" style="color:var(--color-accent-gold);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>`;
     } else if (type === "spreadsheet") {
-      return `<svg class="file-card-icon" style="color:var(--color-apple-green);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/></svg>`;
+      return `<svg class="file-card-icon" style="color:var(--color-apple-green);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/></svg>`;
     } else {
       return `<svg class="file-card-icon" style="color:var(--color-apple-blue);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>`;
     }
@@ -830,7 +679,7 @@ const App = {
     if (!file) return;
 
     document.getElementById("modal-file-title").textContent = file.name;
-    document.getElementById("modal-file-author").textContent = `Dossier : ${this.getCurrentFolder().name} · Ajouté par ${file.author} · ${file.date} · ${file.size}`;
+    document.getElementById("modal-file-author").textContent = `Dossier : ${this.getCurrentFolder().name} · ${file.author || 'MDC'} · ${file.date} · ${file.size}`;
     
     const container = document.getElementById("file-viewer-container");
     if (file.type === "image") {
@@ -881,14 +730,14 @@ const App = {
       a.download = file.name;
       a.click();
     }
-    this.showToast(`Export de « ${file.name} » lancé !`);
+    this.showToast(`Téléchargement de « ${file.name} » lancé`);
   },
 
   deleteFile(fileId, e) {
     if (e) e.stopPropagation();
     const file = store.data.files.find(f => f.id === fileId);
     if (!file) return;
-    if (confirm(`Supprimer le fichier « ${file.name} » ?`)) {
+    if (confirm(`Confirmez-vous la suppression du fichier « ${file.name} » ?`)) {
       store.data.files = store.data.files.filter(f => f.id !== fileId);
       store.save();
       this.renderDriveFiles();
@@ -927,7 +776,7 @@ const App = {
     a.href = URL.createObjectURL(content);
     a.download = `${currentFolder.name.replace(/ /g, '_')}_MDC.zip`;
     a.click();
-    this.showToast(`Dossier « ${currentFolder.name} » exporté en ZIP !`);
+    this.showToast(`Dossier « ${currentFolder.name} » exporté en ZIP`);
   },
 
   handleFileUpload(fileObj) {
@@ -953,6 +802,7 @@ const App = {
     }
 
     const currentFolderId = store.data.currentFolderId || "root";
+    const authorName = store.data.currentUser ? `${store.data.currentUser.firstName} ${store.data.currentUser.lastName.charAt(0)}.` : "Membre MDC";
     const reader = new FileReader();
 
     if (type === "image" || type === "video" || type === "audio" || type === "pdf") {
@@ -963,17 +813,17 @@ const App = {
           name: fileObj.name,
           type: type,
           size: (fileObj.size / (1024 * 1024)).toFixed(2) + " Mo",
-          date: "Aujourd'hui",
+          date: new Date().toLocaleDateString("fr-FR"),
           category: cat,
-          author: store.data.user.name,
+          author: authorName,
           url: e.target.result,
-          content: `Document importé dans le dossier MDC.\nTaille : ${fileObj.size} octets.`
+          content: `Document importé dans le dossier MDC.`
         };
         store.data.files.unshift(newFile);
         store.save();
         this.renderDriveFiles();
         this.renderFolders();
-        this.showToast(`Fichier « ${fileObj.name} » importé dans le dossier !`);
+        this.showToast(`Fichier « ${fileObj.name} » importé`);
       };
       reader.readAsDataURL(fileObj);
     } else {
@@ -984,23 +834,23 @@ const App = {
           name: fileObj.name,
           type: type,
           size: (fileObj.size / (1024 * 1024)).toFixed(2) + " Mo",
-          date: "Aujourd'hui",
+          date: new Date().toLocaleDateString("fr-FR"),
           category: cat,
-          author: store.data.user.name,
+          author: authorName,
           content: e.target.result
         };
         store.data.files.unshift(newFile);
         store.save();
         this.renderDriveFiles();
         this.renderFolders();
-        this.showToast(`Document « ${fileObj.name} » importé !`);
+        this.showToast(`Document « ${fileObj.name} » importé`);
       };
       reader.readAsText(fileObj);
     }
   },
 
   /* ==========================================
-     MODULE 2: CALENDRIER (IMPORT / EXPORT / VISION)
+     MODULE 2: CALENDRIER (VIRGIN)
      ========================================== */
   renderCalendar() {
     const monthTitle = document.getElementById("cal-month-display");
@@ -1048,25 +898,33 @@ const App = {
     gridDays.innerHTML = html;
 
     if (upcomingList) {
-      const sorted = [...store.data.events].sort((a, b) => new Date(a.date) - new Date(b.date));
-      upcomingList.innerHTML = sorted.slice(0, 6).map(ev => {
-        const d = new Date(ev.date);
-        const dayNum = isNaN(d.getDate()) ? "20" : d.getDate();
-        const monthShort = isNaN(d.getMonth()) ? "NOV" : monthNames[d.getMonth()].substring(0, 3).toUpperCase();
-
-        return `
-          <div class="event-item" onclick="App.showEventDetail('${ev.id}')">
-            <div class="event-date-badge">
-              <span class="event-badge-month">${monthShort}</span>
-              <span class="event-badge-day">${dayNum}</span>
-            </div>
-            <div class="event-info">
-              <h4>${ev.title}</h4>
-              <p>${ev.time || '19:00'} · ${ev.location || 'MDC'}</p>
-            </div>
+      if (store.data.events.length === 0) {
+        upcomingList.innerHTML = `
+          <div style="text-align:center; padding:24px 10px; color:var(--color-text-tertiary); font-size:13px;">
+            Aucun événement programmé
           </div>
         `;
-      }).join("");
+      } else {
+        const sorted = [...store.data.events].sort((a, b) => new Date(a.date) - new Date(b.date));
+        upcomingList.innerHTML = sorted.slice(0, 6).map(ev => {
+          const d = new Date(ev.date);
+          const dayNum = isNaN(d.getDate()) ? "" : d.getDate();
+          const monthShort = isNaN(d.getMonth()) ? "" : monthNames[d.getMonth()].substring(0, 3).toUpperCase();
+
+          return `
+            <div class="event-item" onclick="App.showEventDetail('${ev.id}')">
+              <div class="event-date-badge">
+                <span class="event-badge-month">${monthShort}</span>
+                <span class="event-badge-day">${dayNum}</span>
+              </div>
+              <div class="event-info">
+                <h4>${ev.title}</h4>
+                <p>${ev.time || 'Horaire non précisé'} · ${ev.location || 'Lieu non précisé'}</p>
+              </div>
+            </div>
+          `;
+        }).join("");
+      }
     }
   },
 
@@ -1108,7 +966,7 @@ const App = {
     store.save();
     this.closeModal("modal-add-event");
     this.renderCalendar();
-    this.showToast("Événement programmé !");
+    this.showToast("Événement programmé");
   },
 
   showEventDetail(id) {
@@ -1123,6 +981,10 @@ const App = {
   },
 
   exportICS() {
+    if (store.data.events.length === 0) {
+      this.showToast("Aucun événement à exporter");
+      return;
+    }
     let icsContent = "BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//MDC-Conect//FR\nCALSCALE:GREGORIAN\n";
     store.data.events.forEach(ev => {
       const cleanDate = ev.date.replace(/-/g, "");
@@ -1135,7 +997,7 @@ const App = {
     a.href = URL.createObjectURL(blob);
     a.download = "calendrier_mdc.ics";
     a.click();
-    this.showToast("Export du calendrier (.ics) téléchargé !");
+    this.showToast("Export du calendrier (.ics) téléchargé");
   },
 
   importICS(fileObj) {
@@ -1172,13 +1034,13 @@ const App = {
 
       store.save();
       this.renderCalendar();
-      this.showToast(`${count} événement(s) importé(s) dans l'agenda !`);
+      this.showToast(`${count} événement(s) importé(s)`);
     };
     reader.readAsText(fileObj);
   },
 
   /* ==========================================
-     MODULE 3: NOTES & TACHES (IMPORT / EXPORT / VISION)
+     MODULE 3: NOTES & TÂCHES (VIRGIN)
      ========================================== */
   renderTasksAndNotes() {
     const tasksContainer = document.getElementById("tasks-list-container");
@@ -1191,25 +1053,38 @@ const App = {
         tasks = tasks.filter(t => t.title.toLowerCase().includes(this.searchQuery));
       }
 
-      tasksContainer.innerHTML = tasks.map(task => `
-        <div class="task-item ${task.completed ? 'completed' : ''}">
-          <div class="task-left" onclick="App.toggleTask('${task.id}')">
-            <div class="apple-checkbox">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
-            </div>
-            <div>
-              <span class="task-title">${task.title}</span>
-              <div class="task-due">
-                <span>Échéance : ${task.due}</span>
-                <span>· ${task.author}</span>
+      if (tasks.length === 0) {
+        tasksContainer.innerHTML = `
+          <div class="virgin-state-box" style="padding:32px 10px;">
+            <svg class="virgin-state-icon" style="width:36px; height:36px;" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M9 11l3 3L22 4"/>
+              <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>
+            </svg>
+            <div class="virgin-state-title" style="font-size:13.5px;">Aucune tâche en attente</div>
+            <div class="virgin-state-desc" style="font-size:12px;">Saisissez un titre ci-dessus pour ajouter un rappel.</div>
+          </div>
+        `;
+      } else {
+        tasksContainer.innerHTML = tasks.map(task => `
+          <div class="task-item ${task.completed ? 'completed' : ''}">
+            <div class="task-left" onclick="App.toggleTask('${task.id}')">
+              <div class="apple-checkbox">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+              </div>
+              <div>
+                <span class="task-title">${task.title}</span>
+                <div class="task-due">
+                  <span>Échéance : ${task.due}</span>
+                  <span>· ${task.author}</span>
+                </div>
               </div>
             </div>
+            <button class="task-delete-btn" onclick="App.deleteTask('${task.id}')" title="Supprimer">
+              <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+            </button>
           </div>
-          <button class="task-delete-btn" onclick="App.deleteTask('${task.id}')" title="Supprimer">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-          </button>
-        </div>
-      `).join("");
+        `).join("");
+      }
     }
 
     // Notes
@@ -1219,43 +1094,57 @@ const App = {
         notes = notes.filter(n => n.title.toLowerCase().includes(this.searchQuery) || n.content.toLowerCase().includes(this.searchQuery));
       }
 
-      notesContainer.innerHTML = notes.map(note => `
-        <div class="note-card" onclick="App.openNoteViewer('${note.id}')">
-          <div class="note-card-header">
-            <h4 class="note-card-title">${note.title}</h4>
-            <span class="note-card-date">${note.date}</span>
+      if (notes.length === 0) {
+        notesContainer.innerHTML = `
+          <div class="virgin-state-box" style="padding:48px 10px;">
+            <svg class="virgin-state-icon" style="width:36px; height:36px;" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+            </svg>
+            <div class="virgin-state-title" style="font-size:13.5px;">Aucune note enregistrée</div>
+            <div class="virgin-state-desc" style="font-size:12px;">Cliquez sur « Nouvelle Note » pour rédiger un compte-rendu.</div>
           </div>
-          <p class="note-card-body">${this.escapeHTML(note.content)}</p>
-          <div class="note-card-footer">
-            <span class="note-author-tag">${note.tag || 'MDC'}</span>
-            <div style="display:flex; gap:6px;">
-              <button class="file-mini-btn" onclick="event.stopPropagation(); App.exportSingleNote('${note.id}')" title="Exporter cette note">
-                <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                <span>Exporter</span>
-              </button>
-              <button class="file-mini-btn btn-delete" onclick="event.stopPropagation(); App.deleteNote('${note.id}')" title="Supprimer">
-                <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-              </button>
+        `;
+      } else {
+        notesContainer.innerHTML = notes.map(note => `
+          <div class="note-card" onclick="App.openNoteViewer('${note.id}')">
+            <div class="note-card-header">
+              <h4 class="note-card-title">${note.title}</h4>
+              <span class="note-card-date">${note.date}</span>
+            </div>
+            <p class="note-card-body">${this.escapeHTML(note.content)}</p>
+            <div class="note-card-footer">
+              <span class="note-author-tag">${note.tag || 'MDC'}</span>
+              <div style="display:flex; gap:6px;">
+                <button class="file-mini-btn" onclick="event.stopPropagation(); App.exportSingleNote('${note.id}')" title="Exporter cette note">
+                  <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                  <span>Exporter</span>
+                </button>
+                <button class="file-mini-btn btn-delete" onclick="event.stopPropagation(); App.deleteNote('${note.id}')" title="Supprimer">
+                  <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      `).join("");
+        `).join("");
+      }
     }
   },
 
   addTask(title) {
+    const authorName = store.data.currentUser ? store.data.currentUser.firstName : "MDC";
     const newTask = {
       id: "t_" + Date.now(),
       title,
       completed: false,
-      due: "Prochainement",
+      due: "À planifier",
       priority: "normal",
-      author: store.data.user.name
+      author: authorName
     };
     store.data.tasks.unshift(newTask);
     store.save();
     this.renderTasksAndNotes();
-    this.showToast("Tâche ajoutée !");
+    this.showToast("Tâche ajoutée");
   },
 
   toggleTask(id) {
@@ -1278,12 +1167,13 @@ const App = {
     const title = document.getElementById("note-title-input").value;
     const tag = document.getElementById("note-tag-input").value;
     const content = document.getElementById("note-content-input").value;
+    const authorName = store.data.currentUser ? `${store.data.currentUser.firstName} ${store.data.currentUser.lastName.charAt(0)}.` : "MDC";
 
     const newNote = {
       id: "n_" + Date.now(),
       title,
-      author: store.data.user.name,
-      date: "Aujourd'hui",
+      author: authorName,
+      date: new Date().toLocaleDateString("fr-FR"),
       tag: tag || "Général",
       content
     };
@@ -1292,7 +1182,7 @@ const App = {
     store.save();
     this.closeModal("modal-add-note");
     this.renderTasksAndNotes();
-    this.showToast("Note enregistrée dans l'espace MDC !");
+    this.showToast("Note enregistrée");
   },
 
   openNoteViewer(id) {
@@ -1318,12 +1208,16 @@ const App = {
     a.href = URL.createObjectURL(blob);
     a.download = `${note.title.replace(/ /g, '_')}.md`;
     a.click();
-    this.showToast(`Note « ${note.title} » exportée en Markdown !`);
+    this.showToast(`Note « ${note.title} » exportée`);
   },
 
   async exportNotes() {
     if (typeof JSZip === "undefined") {
       this.showToast("Librairie ZIP en cours de chargement...");
+      return;
+    }
+    if (store.data.notes.length === 0) {
+      this.showToast("Aucune note à exporter");
       return;
     }
     const zip = new JSZip();
@@ -1336,7 +1230,7 @@ const App = {
     a.href = URL.createObjectURL(blob);
     a.download = "Notes_MDC_Archive.zip";
     a.click();
-    this.showToast("Toutes les notes ont été exportées en ZIP !");
+    this.showToast("Notes exportées en archive ZIP");
   },
 
   importNotes(fileObj) {
@@ -1344,78 +1238,55 @@ const App = {
     reader.onload = (e) => {
       const text = e.target.result;
       const title = fileObj.name.replace(/\.[^/.]+$/, "");
+      const authorName = store.data.currentUser ? store.data.currentUser.firstName : "MDC";
+
       store.data.notes.unshift({
         id: "n_" + Date.now(),
         title: title,
-        author: store.data.user.name,
-        date: "Aujourd'hui",
-        tag: "Importé",
+        author: authorName,
+        date: new Date().toLocaleDateString("fr-FR"),
+        tag: "Document",
         content: text
       });
       store.save();
       this.renderTasksAndNotes();
-      this.showToast(`Note « ${title} » importée avec succès !`);
+      this.showToast(`Note « ${title} » importée`);
     };
     reader.readAsText(fileObj);
-  },
-
-  /* ==========================================
-     MODULE 4: MEMBRES & EQUIPE
-     ========================================== */
-  renderMembers() {
-    const container = document.getElementById("team-grid-container");
-    if (!container) return;
-
-    container.innerHTML = store.data.members.map(member => `
-      <div class="member-card">
-        <div class="member-avatar-large">${member.avatar}</div>
-        <div class="member-info">
-          <h4>${member.name}</h4>
-          <div class="member-role">${member.role}</div>
-          <span class="member-status-pill">
-            <span style="width:6px; height:6px; border-radius:50%; background:currentColor;"></span>
-            ${member.status}
-          </span>
-        </div>
-      </div>
-    `).join("");
   },
 
   /* ==========================================
      SETTINGS & BACKUP
      ========================================== */
   renderSettingsValues() {
-    const inputClient = document.getElementById("cfg-client-id");
-    const inputKey = document.getElementById("cfg-api-key");
-    const inputDrive = document.getElementById("cfg-drive-id");
     const inputGas = document.getElementById("cfg-gas-url");
+    const inputClient = document.getElementById("cfg-client-id");
+    const inputDrive = document.getElementById("cfg-drive-id");
     const inputCal = document.getElementById("cfg-cal-id");
 
-    if (inputClient) inputClient.value = store.data.settings.googleClientId || "";
-    if (inputKey) inputKey.value = store.data.settings.googleApiKey || "";
-    if (inputDrive) inputDrive.value = store.data.settings.driveFolderId || "";
     if (inputGas) inputGas.value = store.data.settings.gasWebappUrl || "";
+    if (inputClient) inputClient.value = store.data.settings.googleClientId || "";
+    if (inputDrive) inputDrive.value = store.data.settings.driveFolderId || "";
     if (inputCal) inputCal.value = store.data.settings.calendarId || "";
   },
 
   saveSettings() {
-    store.data.settings.googleClientId = document.getElementById("cfg-client-id").value.trim();
-    store.data.settings.googleApiKey = document.getElementById("cfg-api-key").value.trim();
-    store.data.settings.driveFolderId = document.getElementById("cfg-drive-id").value.trim();
     store.data.settings.gasWebappUrl = document.getElementById("cfg-gas-url").value.trim();
+    store.data.settings.googleClientId = document.getElementById("cfg-client-id").value.trim();
+    store.data.settings.driveFolderId = document.getElementById("cfg-drive-id").value.trim();
     store.data.settings.calendarId = document.getElementById("cfg-cal-id").value.trim();
     store.save();
 
     this.closeModal("modal-settings");
-    this.showToast("Paramètres Cloud 4 To enregistrés !");
-    googleApi.init();
+    this.showToast("Paramètres Cloud 4 To enregistrés");
+    this.syncFromGAS();
   },
 
   resetAllData() {
-    if (confirm("Réinitialiser toutes les données de test locales ?")) {
+    if (confirm("Réinitialiser l'espace MDC à son état vierge d'origine ?")) {
       store.reset();
       this.renderAll();
-      this.showToast("Données réinitialisées.");
+      this.showToast("Espace réinitialisé à l'état vierge");
     }
   },
 
