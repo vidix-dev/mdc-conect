@@ -814,7 +814,7 @@ const App = {
     this.renderDriveFiles();
   },
 
-  openFileViewer(fileId) {
+  async openFileViewer(fileId) {
     const file = store.data.files.find(f => f.id === fileId);
     if (!file) return;
 
@@ -822,35 +822,330 @@ const App = {
     document.getElementById("modal-file-author").textContent = `Dossier : ${this.getCurrentFolder().name} · ${file.author || 'MDC'} · ${file.date} · ${file.size}`;
     
     const container = document.getElementById("file-viewer-container");
-    if (file.type === "image") {
-      container.innerHTML = `<img src="${file.url || 'assets/logo.jpg'}" alt="${file.name}">`;
-    } else if (file.type === "video") {
-      container.innerHTML = `<video controls class="apple-video-player" src="${file.url || ''}"><p>Aperçu vidéo</p></video>`;
-    } else if (file.type === "audio") {
-      container.innerHTML = `<audio controls class="apple-audio-player" src="${file.url || ''}"></audio>`;
-    } else if (file.type === "spreadsheet" && file.content && file.content.includes("\t")) {
-      const rows = file.content.split("\n").filter(r => r.trim());
-      const headerCols = rows[0].split("\t");
-      let tableHtml = `<div class="apple-table-wrap"><table class="apple-table"><thead><tr>`;
-      headerCols.forEach(h => tableHtml += `<th>${this.escapeHTML(h)}</th>`);
-      tableHtml += `</tr></thead><tbody>`;
-      rows.slice(1).forEach(row => {
-        tableHtml += `<tr>`;
-        row.split("\t").forEach(c => tableHtml += `<td>${this.escapeHTML(c)}</td>`);
-        tableHtml += `</tr>`;
-      });
-      tableHtml += `</tbody></table></div>`;
-      container.innerHTML = tableHtml;
-    } else {
-      container.innerHTML = `<div class="text-viewer-box">${this.escapeHTML(file.content || "Fichier confiné disponible en téléchargement.")}</div>`;
-    }
-
     const downloadBtn = document.getElementById("btn-download-file");
     if (downloadBtn) {
       downloadBtn.onclick = () => this.downloadSingleFile(file.id);
     }
 
     this.openModal("modal-file-viewer");
+
+    const ext = (file.name.split('.').pop() || "").toLowerCase();
+
+    if (file.type === "image") {
+      container.innerHTML = `<img src="${file.url || 'assets/logo.jpg'}" alt="${file.name}">`;
+    } else if (file.type === "video") {
+      container.innerHTML = `<video controls class="apple-video-player" src="${file.url || ''}"><p>Aperçu vidéo</p></video>`;
+    } else if (file.type === "audio") {
+      container.innerHTML = `<audio controls class="apple-audio-player" src="${file.url || ''}"></audio>`;
+    } else if (file.type === "pdf") {
+      if (file.url) {
+        container.innerHTML = `<iframe src="${file.url}" style="width:100%; height:540px; border:none; border-radius:12px; background:#fff;"></iframe>`;
+      } else {
+        container.innerHTML = this.renderDocumentFallbackCard(file, "Document PDF");
+      }
+    } else if (ext === "docx") {
+      container.innerHTML = `
+        <div style="text-align:center; padding:48px 20px; color:var(--color-text-secondary);">
+          <div class="apple-spinner" style="margin:0 auto 16px;"></div>
+          <p style="font-size:14px; font-weight:500;">Lecture et mise en page du document Word...</p>
+        </div>
+      `;
+      try {
+        const rendered = await this.renderDocxPreview(file);
+        container.innerHTML = rendered;
+      } catch (err) {
+        console.error("Erreur lecture DOCX:", err);
+        container.innerHTML = this.renderDocumentFallbackCard(file, "Document Microsoft Word (.docx)");
+      }
+    } else if (ext === "xlsx" || ext === "xls") {
+      try {
+        const rendered = await this.renderXlsxPreview(file);
+        container.innerHTML = rendered;
+      } catch (err) {
+        container.innerHTML = this.renderDocumentFallbackCard(file, "Feuille de calcul Excel (.xlsx)");
+      }
+    } else if (file.type === "spreadsheet" && file.content && (file.content.includes("\t") || file.content.includes(","))) {
+      container.innerHTML = this.renderCsvPreview(file.content);
+    } else if (file.content && !file.content.startsWith("PK")) {
+      container.innerHTML = `<div class="text-viewer-box">${this.escapeHTML(file.content)}</div>`;
+    } else {
+      container.innerHTML = this.renderDocumentFallbackCard(file, ext ? ext.toUpperCase() : "DOCUMENT");
+    }
+  },
+
+  async renderDocxPreview(file) {
+    if (typeof JSZip === "undefined") {
+      return this.renderDocumentFallbackCard(file, "Document Microsoft Word (.docx)");
+    }
+
+    let zip;
+    if (file.url && file.url.includes("base64,")) {
+      const base64Data = file.url.split("base64,")[1];
+      zip = await JSZip.loadAsync(base64Data, { base64: true });
+    } else if (file.content && file.content.startsWith("PK")) {
+      try {
+        const bytes = new Uint8Array(file.content.length);
+        for (let i = 0; i < file.content.length; i++) {
+          bytes[i] = file.content.charCodeAt(i) & 0xff;
+        }
+        zip = await JSZip.loadAsync(bytes);
+      } catch (_) {
+        return this.renderDocumentFallbackCard(file, "Document Microsoft Word (.docx)");
+      }
+    } else {
+      return this.renderDocumentFallbackCard(file, "Document Microsoft Word (.docx)");
+    }
+
+    // Extract embedded images from word/media/
+    const imageMap = {};
+    const mediaFiles = Object.keys(zip.files).filter(k => k.startsWith("word/media/"));
+    for (const imgPath of mediaFiles) {
+      try {
+        const ext = imgPath.split('.').pop().toLowerCase();
+        const mime = (ext === "jpg" || ext === "jpeg") ? "image/jpeg" : (ext === "gif") ? "image/gif" : "image/png";
+        const imgB64 = await zip.file(imgPath).async("base64");
+        imageMap[imgPath] = `data:${mime};base64,${imgB64}`;
+        const filename = imgPath.split("/").pop();
+        imageMap[filename] = `data:${mime};base64,${imgB64}`;
+      } catch (_) {}
+    }
+
+    // Map relationships in word/_rels/document.xml.rels
+    const relsMap = {};
+    if (zip.file("word/_rels/document.xml.rels")) {
+      try {
+        const relsXml = await zip.file("word/_rels/document.xml.rels").async("string");
+        const parser = new DOMParser();
+        const relsDoc = parser.parseFromString(relsXml, "text/xml");
+        const relNodes = Array.from(relsDoc.getElementsByTagName("Relationship"));
+        relNodes.forEach(node => {
+          const id = node.getAttribute("Id");
+          const target = node.getAttribute("Target");
+          if (id && target) {
+            const filename = target.split("/").pop();
+            if (imageMap[filename]) {
+              relsMap[id] = imageMap[filename];
+            } else if (imageMap["word/" + target]) {
+              relsMap[id] = imageMap["word/" + target];
+            }
+          }
+        });
+      } catch (_) {}
+    }
+
+    const docXmlFile = zip.file("word/document.xml");
+    if (!docXmlFile) {
+      return this.renderDocumentFallbackCard(file, "Document Word (.docx)");
+    }
+
+    const docXmlStr = await docXmlFile.async("string");
+    const parser = new DOMParser();
+    const xmlDoc = parser.parseFromString(docXmlStr, "text/xml");
+    const body = xmlDoc.getElementsByTagName("w:body")[0];
+    if (!body) {
+      return this.renderDocumentFallbackCard(file, "Document Word (.docx)");
+    }
+
+    let docHtml = "";
+    const children = Array.from(body.children);
+
+    for (const child of children) {
+      if (child.nodeName === "w:p") {
+        let pText = "";
+        const runs = Array.from(child.getElementsByTagName("w:r"));
+        
+        // Embedded images in this paragraph
+        const blips = Array.from(child.getElementsByTagName("a:blip"));
+        let pImagesHtml = "";
+        blips.forEach(blip => {
+          const embedId = blip.getAttribute("r:embed");
+          if (embedId && relsMap[embedId]) {
+            pImagesHtml += `<div class="doc-embedded-img-box"><img src="${relsMap[embedId]}" alt="Image du document" class="doc-embedded-img"></div>`;
+          }
+        });
+
+        runs.forEach(run => {
+          const isBold = run.getElementsByTagName("w:b").length > 0;
+          const isItalic = run.getElementsByTagName("w:i").length > 0;
+          const isUnderline = run.getElementsByTagName("w:u").length > 0;
+          
+          const textNodes = Array.from(run.getElementsByTagName("w:t"));
+          let runText = textNodes.map(t => t.textContent).join("");
+          if (runText) {
+            runText = this.escapeHTML(runText);
+            if (isBold) runText = `<strong>${runText}</strong>`;
+            if (isItalic) runText = `<em>${runText}</em>`;
+            if (isUnderline) runText = `<u>${runText}</u>`;
+            pText += runText;
+          }
+        });
+
+        const pPr = child.getElementsByTagName("w:pPr")[0];
+        const pStyle = pPr ? pPr.getElementsByTagName("w:pStyle")[0]?.getAttribute("w:val") : "";
+
+        if (pImagesHtml) {
+          docHtml += pImagesHtml;
+        }
+
+        if (pText.trim()) {
+          if (pStyle && (pStyle.toLowerCase().includes("heading1") || pStyle.toLowerCase().includes("titre1"))) {
+            docHtml += `<h2 class="apple-doc-h2">${pText}</h2>`;
+          } else if (pStyle && (pStyle.toLowerCase().includes("heading2") || pStyle.toLowerCase().includes("titre2"))) {
+            docHtml += `<h3 class="apple-doc-h3">${pText}</h3>`;
+          } else {
+            docHtml += `<p class="apple-doc-p">${pText}</p>`;
+          }
+        }
+      } else if (child.nodeName === "w:tbl") {
+        docHtml += `<div class="apple-table-wrap"><table class="apple-table"><tbody>`;
+        const rows = Array.from(child.getElementsByTagName("w:tr"));
+        rows.forEach(tr => {
+          docHtml += `<tr>`;
+          const cells = Array.from(tr.getElementsByTagName("w:tc"));
+          cells.forEach(tc => {
+            const tcTexts = Array.from(tc.getElementsByTagName("w:t")).map(t => t.textContent).join(" ");
+            docHtml += `<td>${this.escapeHTML(tcTexts.trim())}</td>`;
+          });
+          docHtml += `</tr>`;
+        });
+        docHtml += `</tbody></table></div>`;
+      }
+    }
+
+    if (Object.keys(imageMap).length > 0 && !docHtml.includes("doc-embedded-img")) {
+      docHtml += `
+        <div class="doc-media-section">
+          <div class="doc-media-section-title">Illustrations et captures contenues dans ce document :</div>
+          <div class="doc-media-grid">
+            ${Object.values(imageMap).map(imgUrl => `
+              <div class="doc-embedded-img-box">
+                <img src="${imgUrl}" alt="Illustration Word" class="doc-embedded-img">
+              </div>
+            `).join("")}
+          </div>
+        </div>
+      `;
+    }
+
+    if (!docHtml.trim()) {
+      docHtml = `<p class="apple-doc-empty">Ce document Word ne contient pas de texte extrait.</p>`;
+    }
+
+    return `
+      <div class="apple-doc-sheet">
+        <div class="apple-doc-sheet-header">
+          <div class="apple-doc-badge">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+            <span>Microsoft Word · Document officiel MDC</span>
+          </div>
+          <span style="font-size:12px; color:var(--color-text-tertiary);">${file.size}</span>
+        </div>
+        <div class="apple-doc-content">
+          ${docHtml}
+        </div>
+      </div>
+    `;
+  },
+
+  async renderXlsxPreview(file) {
+    if (typeof JSZip === "undefined" || !file.url || !file.url.includes("base64,")) {
+      return this.renderDocumentFallbackCard(file, "Feuille de calcul Excel (.xlsx)");
+    }
+    const base64Data = file.url.split("base64,")[1];
+    const zip = await JSZip.loadAsync(base64Data, { base64: true });
+    
+    const sharedStringsFile = zip.file("xl/sharedStrings.xml");
+    const sheet1File = zip.file("xl/worksheets/sheet1.xml");
+
+    if (!sheet1File) {
+      return this.renderDocumentFallbackCard(file, "Feuille de calcul Excel (.xlsx)");
+    }
+
+    const sharedStrings = [];
+    if (sharedStringsFile) {
+      const ssXml = await sharedStringsFile.async("string");
+      const parser = new DOMParser();
+      const ssDoc = parser.parseFromString(ssXml, "text/xml");
+      const siNodes = Array.from(ssDoc.getElementsByTagName("si"));
+      siNodes.forEach(si => {
+        const text = Array.from(si.getElementsByTagName("t")).map(t => t.textContent).join("");
+        sharedStrings.push(text);
+      });
+    }
+
+    const sheetXml = await sheet1File.async("string");
+    const parser = new DOMParser();
+    const sheetDoc = parser.parseFromString(sheetXml, "text/xml");
+    const rows = Array.from(sheetDoc.getElementsByTagName("row"));
+
+    if (rows.length === 0) {
+      return this.renderDocumentFallbackCard(file, "Feuille de calcul Excel (.xlsx)");
+    }
+
+    let html = `<div class="apple-table-wrap" style="max-height:480px; overflow:auto;"><table class="apple-table"><tbody>`;
+    rows.forEach(row => {
+      html += `<tr>`;
+      const cells = Array.from(row.getElementsByTagName("c"));
+      cells.forEach(c => {
+        const t = c.getAttribute("t");
+        const v = c.getElementsByTagName("v")[0]?.textContent || "";
+        let cellVal = v;
+        if (t === "s" && sharedStrings[parseInt(v, 10)] !== undefined) {
+          cellVal = sharedStrings[parseInt(v, 10)];
+        }
+        html += `<td>${this.escapeHTML(cellVal)}</td>`;
+      });
+      html += `</tr>`;
+    });
+    html += `</tbody></table></div>`;
+    return html;
+  },
+
+  renderCsvPreview(content) {
+    const delimiter = content.includes("\t") ? "\t" : ",";
+    const lines = content.split("\n").filter(l => l.trim().length > 0);
+    if (lines.length === 0) return `<p style="padding:24px; text-align:center; color:var(--color-text-tertiary);">Fichier tabulaire vide.</p>`;
+    
+    const headers = lines[0].split(delimiter);
+    let html = `<div class="apple-table-wrap" style="max-height:480px; overflow:auto;"><table class="apple-table"><thead><tr>`;
+    headers.forEach(h => html += `<th>${this.escapeHTML(h.trim().replace(/^"|"$/g, ""))}</th>`);
+    html += `</tr></thead><tbody>`;
+
+    lines.slice(1).forEach(row => {
+      html += `<tr>`;
+      row.split(delimiter).forEach(cell => {
+        html += `<td>${this.escapeHTML(cell.trim().replace(/^"|"$/g, ""))}</td>`;
+      });
+      html += `</tr>`;
+    });
+    html += `</tbody></table></div>`;
+    return html;
+  },
+
+  renderDocumentFallbackCard(file, label) {
+    const ext = (file.name.split('.').pop() || "").toUpperCase();
+    return `
+      <div class="apple-doc-fallback-card">
+        <div class="apple-doc-fallback-icon">
+          <svg width="44" height="44" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+            <line x1="16" y1="13" x2="8" y2="13"/>
+            <line x1="16" y1="17" x2="8" y2="17"/>
+          </svg>
+          <span class="apple-doc-fallback-ext">${ext}</span>
+        </div>
+        <h3 class="apple-doc-fallback-title">${this.escapeHTML(file.name)}</h3>
+        <p class="apple-doc-fallback-meta">${label || 'Document confiné'} · ${file.size} · Ajouté par ${file.author || 'MDC'}</p>
+        <p class="apple-doc-fallback-desc">Ce fichier est stocké de manière sécurisée et confinée sur MDC-Conect. Vous pouvez l'exporter ou l'ouvrir directement dans son application dédiée.</p>
+        <div class="apple-doc-fallback-actions">
+          <button class="apple-btn btn-primary" onclick="App.downloadSingleFile('${file.id}')">
+            <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            <span>Télécharger / Ouvrir ${ext}</span>
+          </button>
+        </div>
+      </div>
+    `;
   },
 
   downloadSingleFile(fileId, e) {
@@ -920,35 +1215,54 @@ const App = {
   },
 
   handleFileUpload(fileObj) {
-    const ext = fileObj.name.split('.').pop().toLowerCase();
+    const ext = (fileObj.name.split('.').pop() || "").toLowerCase();
     let type = "document";
     let cat = "documents";
 
-    if (["jpg", "jpeg", "png", "webp", "gif"].includes(ext)) {
+    if (["jpg", "jpeg", "png", "webp", "gif", "svg"].includes(ext)) {
       type = "image";
       cat = "images";
-    } else if (["mp4", "mov", "webm", "avi"].includes(ext)) {
+    } else if (["mp4", "mov", "webm", "avi", "mkv"].includes(ext)) {
       type = "video";
       cat = "images";
-    } else if (["mp3", "wav", "ogg", "m4a"].includes(ext)) {
+    } else if (["mp3", "wav", "ogg", "m4a", "aac"].includes(ext)) {
       type = "audio";
       cat = "images";
-    } else if (["xls", "xlsx", "csv"].includes(ext)) {
+    } else if (["xls", "xlsx", "csv", "tsv", "numbers"].includes(ext)) {
       type = "spreadsheet";
       cat = "spreadsheets";
     } else if (ext === "pdf") {
       type = "pdf";
       cat = "documents";
+    } else if (["zip", "rar", "7z", "tar", "gz"].includes(ext)) {
+      type = "archive";
+      cat = "documents";
+    } else if (["docx", "doc", "pages", "odt", "rtf"].includes(ext)) {
+      type = "document";
+      cat = "documents";
+    } else if (["pptx", "ppt", "key"].includes(ext)) {
+      type = "presentation";
+      cat = "documents";
     }
 
     const currentFolderId = store.data.currentFolderId || "root";
     const authorName = store.data.currentUser ? `${store.data.currentUser.firstName} ${store.data.currentUser.lastName.charAt(0)}.` : "Membre MDC";
+    const isPlainText = ["txt", "md", "markdown", "csv", "tsv", "json", "xml", "html", "css", "js", "log", "yml", "yaml"].includes(ext);
+
     const reader = new FileReader();
 
-    if (type === "image" || type === "video" || type === "audio" || type === "pdf") {
+    if (isPlainText) {
       reader.onload = (e) => {
+        const textData = e.target.result;
+        let base64Url = "";
+        try {
+          base64Url = "data:text/plain;charset=utf-8;base64," + btoa(unescape(encodeURIComponent(textData)));
+        } catch (_) {
+          base64Url = "";
+        }
+
         const newFile = {
-          id: "f_" + Date.now() + "_" + Math.floor(Math.random()*1000),
+          id: "f_" + Date.now() + "_" + Math.floor(Math.random() * 1000),
           folderId: currentFolderId,
           name: fileObj.name,
           type: type,
@@ -956,28 +1270,8 @@ const App = {
           date: new Date().toLocaleDateString("fr-FR"),
           category: cat,
           author: authorName,
-          url: e.target.result,
-          content: `Document importé dans le dossier MDC.`
-        };
-        store.data.files.unshift(newFile);
-        store.save();
-        this.renderDriveFiles();
-        this.renderFolders();
-        this.showToast(`Fichier « ${fileObj.name} » importé`);
-      };
-      reader.readAsDataURL(fileObj);
-    } else {
-      reader.onload = (e) => {
-        const newFile = {
-          id: "f_" + Date.now() + "_" + Math.floor(Math.random()*1000),
-          folderId: currentFolderId,
-          name: fileObj.name,
-          type: type,
-          size: (fileObj.size / (1024 * 1024)).toFixed(2) + " Mo",
-          date: new Date().toLocaleDateString("fr-FR"),
-          category: cat,
-          author: authorName,
-          content: e.target.result
+          content: textData,
+          url: base64Url
         };
         store.data.files.unshift(newFile);
         store.save();
@@ -986,6 +1280,30 @@ const App = {
         this.showToast(`Document « ${fileObj.name} » importé`);
       };
       reader.readAsText(fileObj);
+    } else {
+      // Binary files: DOCX, XLSX, PPTX, PDF, ZIP, Images, Audio, Video, etc.
+      // ALWAYS read as DataURL to preserve pristine binary data!
+      reader.onload = (e) => {
+        const dataUrl = e.target.result;
+        const newFile = {
+          id: "f_" + Date.now() + "_" + Math.floor(Math.random() * 1000),
+          folderId: currentFolderId,
+          name: fileObj.name,
+          type: type,
+          size: (fileObj.size / (1024 * 1024)).toFixed(2) + " Mo",
+          date: new Date().toLocaleDateString("fr-FR"),
+          category: cat,
+          author: authorName,
+          url: dataUrl,
+          content: ""
+        };
+        store.data.files.unshift(newFile);
+        store.save();
+        this.renderDriveFiles();
+        this.renderFolders();
+        this.showToast(`Fichier « ${fileObj.name} » importé avec succès`);
+      };
+      reader.readAsDataURL(fileObj);
     }
   },
 
