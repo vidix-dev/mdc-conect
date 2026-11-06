@@ -27,12 +27,9 @@ Le site est hébergeable gratuitement et sans serveur sur GitHub Pages.
 - Exportation d'une note spécifique ou sauvegarde de toutes les notes sous forme d'archive ZIP.
 
 ### 4. Gestion des Comptes et Accès
-- Authentification simplifiée par identifiant unique.
-- Règle de génération de l'identifiant : **première lettre du prénom + nom de famille + jour de naissance**.
-  - Exemple : Victor Doussot né le 19 -> **vdoussot19**
-- Module d'administration des comptes dans l'onglet « Comptes » :
-  - Création de nouveaux membres avec génération automatique de l'identifiant.
-  - Suppression de comptes d'équipe en un clic.
+- **Création autonome de compte** : N'importe quel membre peut créer son compte directement depuis l'écran d'accueil sans dépendre de l'administrateur, et accéder immédiatement à la plateforme.
+- **Règle de génération de l'identifiant** : `première lettre du prénom + nom de famille + jour de naissance` (ex : Jean Dupont né le 12 -> `jdupont12`).
+- **Révocation d'accès réservée à l'administrateur** : Seul l'administrateur a le pouvoir de révoquer ou supprimer les comptes des membres dans l'onglet « Comptes ». Les membres ordinaires ont uniquement accès à l'annuaire sans pouvoir supprimer les autres.
 
 ---
 

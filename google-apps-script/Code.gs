@@ -38,7 +38,8 @@ function doGet(e) {
         files: driveData.files,
         events: mergedEvents,
         notes: sharedData.notes || [],
-        tasks: sharedData.tasks || []
+        tasks: sharedData.tasks || [],
+        accounts: sharedData.accounts || []
       };
     } else if (action === "list") {
       response = listFilesAndFolders(folderId);
@@ -107,7 +108,8 @@ function doPost(e) {
       saveSyncFile({
         events: data.events || [],
         notes: data.notes || [],
-        tasks: data.tasks || []
+        tasks: data.tasks || [],
+        accounts: data.accounts || []
       });
       response = { success: true };
     } else if (action === "createCalendarEvent") {
@@ -225,7 +227,7 @@ function loadSyncFile() {
   } catch (e) {
     // Erreur de lecture
   }
-  return { events: [], notes: [], tasks: [] };
+  return { events: [], notes: [], tasks: [], accounts: [] };
 }
 
 function saveSyncFile(data) {

@@ -138,6 +138,87 @@ const App = {
       });
     });
 
+    // Lock screen switch between Login and Register views
+    document.getElementById("btn-switch-to-register")?.addEventListener("click", () => {
+      document.getElementById("lock-view-login").style.display = "none";
+      document.getElementById("lock-view-register").style.display = "block";
+      document.getElementById("lock-card-title").textContent = "Créer un compte";
+      document.getElementById("lock-card-subtitle").textContent = "Rejoindre l'espace Maison Du Charlo";
+      document.getElementById("reg-fname-input")?.focus();
+    });
+
+    document.getElementById("btn-switch-to-login")?.addEventListener("click", () => {
+      document.getElementById("lock-view-register").style.display = "none";
+      document.getElementById("lock-view-login").style.display = "block";
+      document.getElementById("lock-card-title").textContent = "MDC-Conect";
+      document.getElementById("lock-card-subtitle").textContent = "Portail collaboratif 4 To · Maison Du Charlo";
+      document.getElementById("lock-username-input")?.focus();
+    });
+
+    // Realtime preview for autonomous registration on Lock Screen
+    const regFname = document.getElementById("reg-fname-input");
+    const regLname = document.getElementById("reg-lname-input");
+    const regBday = document.getElementById("reg-bday-input");
+    const regPreview = document.getElementById("reg-preview-username");
+
+    const updateRegPreview = () => {
+      if (!regPreview) return;
+      const fn = regFname?.value || "";
+      const ln = regLname?.value || "";
+      const bd = regBday?.value || "";
+      const code = generateUsername(fn, ln, bd);
+      regPreview.textContent = code ? code : "jdupont12";
+    };
+
+    regFname?.addEventListener("input", updateRegPreview);
+    regLname?.addEventListener("input", updateRegPreview);
+    regBday?.addEventListener("input", updateRegPreview);
+
+    // Form submit for Lock Screen autonomous registration
+    document.getElementById("form-lock-register")?.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const fn = regFname.value.trim();
+      const ln = regLname.value.trim();
+      const bd = regBday.value.trim();
+
+      const username = generateUsername(fn, ln, bd);
+      if (!username) {
+        alert("Veuillez renseigner votre prénom, nom et jour de naissance.");
+        return;
+      }
+
+      const exists = store.data.accounts.some(a => a.username.toLowerCase() === username.toLowerCase());
+      if (exists) {
+        alert(`Le compte « ${username} » existe déjà. Vous pouvez vous connecter.`);
+        document.getElementById("btn-switch-to-login")?.click();
+        const input = document.getElementById("lock-username-input");
+        if (input) input.value = username;
+        return;
+      }
+
+      const newAccount = {
+        id: "acc_" + Date.now(),
+        username: username,
+        firstName: fn,
+        lastName: ln,
+        birthDay: parseInt(bd, 10),
+        role: "Membre",
+        createdAt: new Date().toLocaleDateString("fr-FR")
+      };
+
+      store.data.accounts.push(newAccount);
+      store.save();
+      this.pushSyncToGAS();
+
+      // Automatically login
+      store.data.currentUser = newAccount;
+      store.save();
+      const lockScreen = document.getElementById("lock-screen-overlay");
+      if (lockScreen) lockScreen.classList.add("hidden");
+      this.renderAll();
+      this.showToast(`Bienvenue ${fn} ! Votre identifiant est ${username}`);
+    });
+
     // Login Form Submit
     document.getElementById("form-lock-login")?.addEventListener("submit", (e) => {
       e.preventDefault();
@@ -295,6 +376,7 @@ const App = {
   logout() {
     store.data.currentUser = null;
     store.save();
+    document.getElementById("btn-switch-to-login")?.click();
     const lockScreen = document.getElementById("lock-screen-overlay");
     if (lockScreen) lockScreen.classList.remove("hidden");
     const input = document.getElementById("lock-username-input");
@@ -335,6 +417,7 @@ const App = {
 
     store.data.accounts.push(newAccount);
     store.save();
+    this.pushSyncToGAS();
 
     this.closeModal("modal-create-account");
     this.renderAccountsList();
@@ -347,26 +430,38 @@ const App = {
     }
   },
 
-  deleteAccount(accountId) {
+  isAdmin() {
+    return store.data.currentUser && (store.data.currentUser.role === "Administrateur" || store.data.currentUser.username === "vdoussot19");
+  },
+
+  revokeAccount(accountId) {
+    if (!this.isAdmin()) {
+      alert("Seul l'administrateur a le pouvoir de révoquer un compte.");
+      return;
+    }
+
     const account = store.data.accounts.find(a => a.id === accountId);
     if (!account) return;
 
     if (store.data.currentUser && store.data.currentUser.id === accountId) {
-      alert("Vous ne pouvez pas supprimer le compte actuellement connecté.");
+      alert("Vous ne pouvez pas révoquer votre propre compte administrateur.");
       return;
     }
 
-    if (confirm(`Confirmez-vous la suppression du compte « ${account.firstName} ${account.lastName} » (${account.username}) ?`)) {
+    if (confirm(`Confirmez-vous la révocation du compte de « ${account.firstName} ${account.lastName} » (${account.username}) ? Cette personne ne pourra plus accéder à MDC-Conect.`)) {
       store.data.accounts = store.data.accounts.filter(a => a.id !== accountId);
       store.save();
+      this.pushSyncToGAS();
       this.renderAccountsList();
-      this.showToast("Compte supprimé");
+      this.showToast(`Compte « ${account.username} » révoqué avec succès`);
     }
   },
 
   renderAccountsList() {
     const container = document.getElementById("accounts-list-container");
     if (!container) return;
+
+    const isAdmin = this.isAdmin();
 
     container.innerHTML = store.data.accounts.map(acc => {
       const initials = (acc.firstName.charAt(0) + acc.lastName.charAt(0)).toUpperCase();
@@ -386,12 +481,14 @@ const App = {
             </div>
           </div>
           <div style="display:flex; align-items:center; gap:8px;">
-            ${!isCurrent ? `
-              <button class="file-mini-btn btn-delete" onclick="App.deleteAccount('${acc.id}')" title="Supprimer ce compte">
-                <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                <span>Supprimer</span>
+            ${isAdmin && !isCurrent ? `
+              <button class="file-mini-btn btn-delete" onclick="App.revokeAccount('${acc.id}')" title="Révoquer l'accès de ce compte">
+                <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+                <span>Révoquer l'accès</span>
               </button>
-            ` : ''}
+            ` : `
+              <span class="sidebar-badge" style="color:var(--color-apple-green); font-size:11.5px;">Actif</span>
+            `}
           </div>
         </div>
       `;
@@ -426,11 +523,21 @@ const App = {
           if (Array.isArray(data.tasks)) {
             store.data.tasks = data.tasks;
           }
+          if (Array.isArray(data.accounts) && data.accounts.length > 0) {
+            // Keep admin vdoussot19 always present
+            const existingUsernames = new Set(data.accounts.map(a => a.username.toLowerCase()));
+            const admin = store.data.accounts.find(a => a.username === "vdoussot19");
+            if (admin && !existingUsernames.has("vdoussot19")) {
+              data.accounts.unshift(admin);
+            }
+            store.data.accounts = data.accounts;
+          }
           store.save();
           this.renderFolders();
           this.renderDriveFiles();
           this.renderCalendar();
           this.renderTasksAndNotes();
+          this.renderAccountsList();
         }
       } catch (parseErr) {
         // En attente d'autorisation Google Apps Script
@@ -453,7 +560,8 @@ const App = {
           action: "saveSyncData",
           events: store.data.events,
           notes: store.data.notes,
-          tasks: store.data.tasks
+          tasks: store.data.tasks,
+          accounts: store.data.accounts
         })
       });
     } catch (e) {
