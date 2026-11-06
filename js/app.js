@@ -653,6 +653,62 @@ const App = {
     }
   },
 
+  async forceReloadFromServer() {
+    const icons = document.querySelectorAll("#icon-force-reload, .reload-icon-svg");
+    icons.forEach(ic => ic.classList.add("spinning"));
+
+    this.showToast("Actualisation en direct depuis le serveur...");
+
+    const baseUrl = (store.data.settings.cloudApiUrl || "https://extranet-cad.duckdns.org/mdc-api/").replace(/\/?$/, "/");
+    try {
+      const res = await fetch(`${baseUrl}syncAll?_t=${Date.now()}`, {
+        cache: "no-store",
+        headers: {
+          "Cache-Control": "no-cache, no-store, must-revalidate",
+          "Pragma": "no-cache"
+        }
+      });
+      const data = await res.json();
+      if (data && data.success) {
+        if (Array.isArray(data.folders)) store.data.folders = data.folders;
+        if (Array.isArray(data.files)) {
+          const localCache = new Map();
+          store.data.files.forEach(f => {
+            if (f.url && f.url.startsWith("data:")) localCache.set(f.id, f.url);
+          });
+          store.data.files = data.files.map(df => {
+            if (localCache.has(df.id)) df.url = localCache.get(df.id);
+            return df;
+          });
+        }
+        if (Array.isArray(data.events)) store.data.events = data.events;
+        if (Array.isArray(data.notes)) store.data.notes = data.notes;
+        if (Array.isArray(data.tasks)) store.data.tasks = data.tasks;
+        if (Array.isArray(data.accounts) && data.accounts.length > 0) {
+          const existingUsernames = new Set(data.accounts.map(a => a.username.toLowerCase()));
+          const admin = store.data.accounts.find(a => a.username === "vdoussot19");
+          if (admin && !existingUsernames.has("vdoussot19")) {
+            data.accounts.unshift(admin);
+          }
+          store.data.accounts = data.accounts;
+        }
+
+        store.save();
+        this.renderAll();
+        this.showToast(`Données à jour : ${store.data.notes.length} note(s), ${store.data.files.length} fichier(s)`);
+      } else {
+        this.showToast("Erreur lors de la réponse du serveur");
+      }
+    } catch (err) {
+      console.error("Force reload failed:", err);
+      this.showToast("Échec de connexion au serveur");
+    } finally {
+      setTimeout(() => {
+        icons.forEach(ic => ic.classList.remove("spinning"));
+      }, 700);
+    }
+  },
+
   async checkGasConnection(showToastMessage = false) {
     if (showToastMessage) {
       this.showToast("Synchronisation en cours avec le Cloud 4 To...");

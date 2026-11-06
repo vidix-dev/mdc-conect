@@ -14,7 +14,7 @@
   <link rel="apple-touch-icon" href="assets/logo.jpg">
 
   <!-- Apple Theme Stylesheet -->
-  <link rel="stylesheet" href="css/apple-theme.css">
+  <link rel="stylesheet" href="css/apple-theme.css?v=20261106_v5">
 
   <!-- JSZip for Client-side Folder & Notes Zip Exports -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -117,6 +117,11 @@
         <span id="status-text">Connecté</span>
       </div>
 
+      <!-- Bouton Recharger Tout (Serveur Cloud) -->
+      <button class="icon-btn" id="btn-force-reload" onclick="App.forceReloadFromServer()" title="Recharger tout depuis le serveur" aria-label="Recharger tout">
+        <svg id="icon-force-reload" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+      </button>
+
       <!-- Dark / Light Mode Toggle -->
       <button class="icon-btn" id="btn-toggle-theme" title="Changer le thème">
         <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
@@ -159,6 +164,10 @@
           <p class="view-subtitle">Stockage 4 To Maison Du Charlo · Synchronisation Google Drive automatique</p>
         </div>
         <div class="action-bar">
+          <button class="apple-btn" onclick="App.forceReloadFromServer()" title="Recharger les fichiers depuis le serveur">
+            <svg class="reload-icon-svg" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+            <span>Actualiser</span>
+          </button>
           <input type="file" id="file-picker-hidden" multiple style="display:none;">
           <button class="apple-btn" onclick="App.openModal('modal-create-folder')">
             <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg>
@@ -270,6 +279,10 @@
           <p class="view-subtitle">Planification collaborative · Importation et exportation d'événements</p>
         </div>
         <div class="action-bar">
+          <button class="apple-btn" onclick="App.forceReloadFromServer()" title="Recharger l'agenda depuis le serveur">
+            <svg class="reload-icon-svg" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+            <span>Actualiser</span>
+          </button>
           <input type="file" id="cal-import-picker" accept=".ics" style="display:none;">
           <button class="apple-btn" id="btn-import-ics" title="Importer un fichier de calendrier (.ics)">
             <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
@@ -342,6 +355,10 @@
           <p class="view-subtitle">Suivi d'activité · Comptes-rendus partagés et liste de tâches</p>
         </div>
         <div class="action-bar">
+          <button class="apple-btn" onclick="App.forceReloadFromServer()" title="Recharger les notes depuis le serveur">
+            <svg class="reload-icon-svg" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+            <span>Actualiser</span>
+          </button>
           <input type="file" id="notes-import-picker" accept=".txt,.md,.json" style="display:none;">
           <button class="apple-btn" id="btn-import-notes" title="Importer des documents texte ou markdown">
             <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
@@ -648,6 +665,6 @@
   <div class="apple-toast" id="app-toast"></div>
 
   <!-- Application Logic -->
-  <script src="js/app.js"></script>
+  <script src="js/app.js?v=20261106_v5"></script>
 </body>
 </html>

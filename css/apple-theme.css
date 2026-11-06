@@ -1624,6 +1624,12 @@ a {
   to { transform: rotate(360deg); }
 }
 
+.spinning,
+.icon-spinning {
+  animation: appleSpin 0.7s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  transform-origin: center;
+}
+
 /* Toast Notifications */
 .apple-toast {
   position: fixed;
