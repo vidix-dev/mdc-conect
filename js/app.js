@@ -100,6 +100,7 @@ const App = {
     this.applyTheme();
     this.checkAuthStatus();
     this.syncFromGAS();
+    setInterval(() => this.syncFromGAS(), 30000);
   },
 
   bindEvents() {
@@ -162,7 +163,7 @@ const App = {
       const ln = lnameInput?.value || "";
       const bd = bdayInput?.value || "";
       const code = generateUsername(fn, ln, bd);
-      previewBox.textContent = code ? code : "vdoussot19";
+      previewBox.textContent = code ? code : "jdupont12";
     };
 
     fnameInput?.addEventListener("input", updatePreview);
@@ -287,7 +288,7 @@ const App = {
       this.renderAll();
       this.showToast(`Bienvenue ${account.firstName} ${account.lastName}`);
     } else {
-      alert(`Identifiant « ${username} » introuvable.\n\nLe format requis est : première lettre du prénom + nom de famille + jour de naissance (par exemple : vdoussot19).`);
+      alert(`Identifiant « ${username} » introuvable.\n\nLe format requis est : première lettre du prénom + nom de famille + jour de naissance (par exemple : jdupont12).`);
     }
   },
 
@@ -405,27 +406,58 @@ const App = {
     if (!url) return;
 
     try {
-      const res = await fetch(url + "?action=list", { mode: "cors" });
+      const res = await fetch(url + "?action=syncAll", { mode: "cors" });
       const text = await res.text();
       try {
         const data = JSON.parse(text);
         if (data && data.success) {
-          if (Array.isArray(data.folders) && data.folders.length > 0) {
+          if (Array.isArray(data.folders)) {
             store.data.folders = data.folders;
           }
-          if (Array.isArray(data.files) && data.files.length > 0) {
+          if (Array.isArray(data.files)) {
             store.data.files = data.files;
+          }
+          if (Array.isArray(data.events)) {
+            store.data.events = data.events;
+          }
+          if (Array.isArray(data.notes)) {
+            store.data.notes = data.notes;
+          }
+          if (Array.isArray(data.tasks)) {
+            store.data.tasks = data.tasks;
           }
           store.save();
           this.renderFolders();
           this.renderDriveFiles();
+          this.renderCalendar();
+          this.renderTasksAndNotes();
         }
       } catch (parseErr) {
-        // Returned HTML (e.g., auth prompt)
-        console.log("GAS Response is not JSON yet");
+        // En attente d'autorisation Google Apps Script
       }
     } catch (e) {
-      console.warn("GAS sync error", e);
+      console.warn("GAS sync notice:", e);
+    }
+  },
+
+  async pushSyncToGAS() {
+    const url = store.data.settings.gasWebappUrl;
+    if (!url) return;
+
+    try {
+      await fetch(url, {
+        method: "POST",
+        mode: "no-cors",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "saveSyncData",
+          events: store.data.events,
+          notes: store.data.notes,
+          tasks: store.data.tasks
+        })
+      });
+    } catch (e) {
+      console.warn("GAS push error:", e);
     }
   },
 
@@ -964,6 +996,7 @@ const App = {
 
     store.data.events.push(newEvent);
     store.save();
+    this.pushSyncToGAS();
     this.closeModal("modal-add-event");
     this.renderCalendar();
     this.showToast("Événement programmé");
@@ -975,6 +1008,7 @@ const App = {
     if (confirm(`Événement MDC :\n\n${ev.title}\nDate : ${ev.date} (${ev.time})\nLieu : ${ev.location}\nDescription : ${ev.description || "Aucune"}\n\nVoulez-vous supprimer cet événement ?`)) {
       store.data.events = store.data.events.filter(e => e.id !== id);
       store.save();
+      this.pushSyncToGAS();
       this.renderCalendar();
       this.showToast("Événement supprimé");
     }
@@ -1143,6 +1177,7 @@ const App = {
     };
     store.data.tasks.unshift(newTask);
     store.save();
+    this.pushSyncToGAS();
     this.renderTasksAndNotes();
     this.showToast("Tâche ajoutée");
   },
@@ -1152,6 +1187,7 @@ const App = {
     if (task) {
       task.completed = !task.completed;
       store.save();
+      this.pushSyncToGAS();
       this.renderTasksAndNotes();
     }
   },
@@ -1159,6 +1195,7 @@ const App = {
   deleteTask(id) {
     store.data.tasks = store.data.tasks.filter(t => t.id !== id);
     store.save();
+    this.pushSyncToGAS();
     this.renderTasksAndNotes();
     this.showToast("Tâche supprimée");
   },
@@ -1180,6 +1217,7 @@ const App = {
 
     store.data.notes.unshift(newNote);
     store.save();
+    this.pushSyncToGAS();
     this.closeModal("modal-add-note");
     this.renderTasksAndNotes();
     this.showToast("Note enregistrée");
@@ -1195,6 +1233,7 @@ const App = {
     if (confirm("Supprimer cette note ?")) {
       store.data.notes = store.data.notes.filter(n => n.id !== id);
       store.save();
+      this.pushSyncToGAS();
       this.renderTasksAndNotes();
       this.showToast("Note supprimée");
     }
